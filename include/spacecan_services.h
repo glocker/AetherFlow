@@ -7,7 +7,8 @@
 extern "C" {
 #endif
 
-/* Service identifiers used by LibreCube/SpaceCAN style application packets. */
+// Service identifiers used by LibreCube/SpaceCAN style application packets
+// For EPS stage to send housekeeping telemetry
 typedef enum {
     SPACECAN_SERVICE_HOUSEKEEPING = 3,
     SPACECAN_SERVICE_PARAMETER = 20,

@@ -16,6 +16,12 @@ static uint8_t fragment_header(spacecan_fragment_kind_t kind, uint8_t sequence)
                      (sequence & SPACECAN_FRAGMENT_SEQ_MASK));
 }
 
+// Builds a SpaceCAN packet with the given service, subtype and payload
+// For example, housekeeping report
+// service = 3
+// subtype = 25
+// payload = telemetry bytes
+
 spacecan_status_t spacecan_packet_build(uint8_t service,
                                         uint8_t subtype,
                                         const uint8_t *payload,
@@ -48,6 +54,7 @@ spacecan_status_t spacecan_packet_build(uint8_t service,
     return SPACECAN_OK;
 }
 
+// Returns view struct: view.service, view.subtype and etc
 spacecan_status_t spacecan_packet_parse(const uint8_t *packet,
                                         size_t packet_len,
                                         spacecan_packet_view_t *out_view)
@@ -66,6 +73,16 @@ spacecan_status_t spacecan_packet_parse(const uint8_t *packet,
     return SPACECAN_OK;
 }
 
+// CAN frame 8 bytes length
+// SpaceCAN packet can be longer than CAN frame
+// So function splits a packet into multiple CAN frames
+// SpaceCAN packet -> can_frame_t frames[]
+
+// Every first byte of frame contains fragment type (SINGLE, FIRST, CONSECUTIVE, LAST) and sequence number
+// If packet is too large:
+// 1 byte fragment type + 1 byte sequence number + 6 bytes payload
+// Next frames: [data0 = CONSECUTIVE][7 bytes packet]
+// Last frame: [data0 = LAST][rest packet]
 spacecan_status_t spacecan_fragment_packet(spacecan_frame_class_t frame_class,
                                            uint8_t node_id,
                                            const uint8_t *packet,
@@ -150,6 +167,8 @@ uint8_t spacecan_u8(const uint8_t *data)
     return data[0];
 }
 
+// Big endian for C - Python compatibility
+// Could serialize numbers both in same way
 uint16_t spacecan_get_u16_be(const uint8_t *data)
 {
     return (uint16_t)(((uint16_t)data[0] << 8u) | (uint16_t)data[1]);

@@ -24,6 +24,13 @@ extern "C" {
  * ranges so the codec can be exercised in-memory now and wired to SocketCAN only
  * in a later stage.
  */
+
+// CAN IDs calculates like:
+// SYNC      = 0x080
+// REPLY     = 0x580 + node_id
+// REQUEST   = 0x600 + node_id
+// HEARTBEAT = 0x700 + node_id
+
 typedef enum {
     SPACECAN_FRAME_SYNC = 0,
     SPACECAN_FRAME_HEARTBEAT = 1,
@@ -70,7 +77,11 @@ typedef struct {
 } spacecan_reassembly_t;
 
 bool spacecan_node_id_valid(uint8_t node_id);
+// Takes frame class, node ID and returns related CAN ID
+// For example, for node 1 REPLY 0x580 returns 0x581
 uint32_t spacecan_make_can_id(spacecan_frame_class_t frame_class, uint8_t node_id);
+// Takes a parsed CAN ID and returns the frame class and node ID
+// For 0x581 returns this's REPLY from node 1
 spacecan_status_t spacecan_parse_can_id(uint32_t can_id, spacecan_id_t *parsed);
 
 spacecan_status_t spacecan_make_frame(can_frame_t *frame,

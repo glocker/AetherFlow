@@ -38,6 +38,7 @@ void spacecan_reassembly_reset(spacecan_reassembly_t *state)
     }
 }
 
+// Gets frames one by one
 spacecan_status_t spacecan_reassembly_accept(spacecan_reassembly_t *state,
                                              const can_frame_t *frame,
                                              uint8_t *out_packet,
@@ -62,6 +63,8 @@ spacecan_status_t spacecan_reassembly_accept(spacecan_reassembly_t *state,
     sequence = frame_sequence(frame);
 
     switch (kind) {
+
+    // Returns single ready packet back
     case SPACECAN_FRAGMENT_SINGLE: {
         size_t packet_len;
         if (state->active) {
@@ -79,6 +82,9 @@ spacecan_status_t spacecan_reassembly_accept(spacecan_reassembly_t *state,
         return SPACECAN_OK;
     }
 
+    // Remembers total_len
+    // Copy first bytes
+    // Awaits next fragment
     case SPACECAN_FRAGMENT_FIRST: {
         uint8_t total_len;
         if (state->active) {
@@ -100,7 +106,11 @@ spacecan_status_t spacecan_reassembly_accept(spacecan_reassembly_t *state,
         return SPACECAN_ERR_IN_PROGRESS;
     }
 
+    // Check sequence and adds data to buffer
     case SPACECAN_FRAGMENT_CONSECUTIVE:
+
+    // Check sequence and adds rest data
+    // Returns ready packet for same length
     case SPACECAN_FRAGMENT_LAST: {
         size_t chunk_len;
         if (!state->active) {

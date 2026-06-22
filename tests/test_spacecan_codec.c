@@ -23,6 +23,8 @@
 
 #define ASSERT_EQ_STATUS(expected, actual) ASSERT_EQ_U32((uint32_t)(expected), (uint32_t)(actual))
 
+// REPLY node 1 → 0x581
+// REQUEST node 1 → 0x601
 static int test_can_id_helpers(void)
 {
     spacecan_id_t parsed;
@@ -40,6 +42,7 @@ static int test_can_id_helpers(void)
     return 0;
 }
 
+// 0x1234 → 0x12 0x34
 static int test_integer_encoding(void)
 {
     uint8_t data[4];
@@ -61,6 +64,7 @@ static int test_integer_encoding(void)
     return 0;
 }
 
+// service/subtype/payload
 static int test_service_packet_parse(void)
 {
     uint8_t payload[] = {0x01u, 0x02u, 0x03u};
@@ -87,6 +91,7 @@ static int test_service_packet_parse(void)
     return 0;
 }
 
+// packet → one CAN frame → packet
 static int test_single_frame_roundtrip(void)
 {
     uint8_t packet[] = {SPACECAN_SERVICE_PARAMETER, SPACECAN_PARAMETER_SUBTYPE_GET, 0x10u};
@@ -120,6 +125,7 @@ static int test_single_frame_roundtrip(void)
     return 0;
 }
 
+// long packet → several CAN frames → original packet
 static int test_multi_frame_roundtrip(void)
 {
     uint8_t payload[20];
@@ -177,6 +183,7 @@ static int test_multi_frame_roundtrip(void)
     return 0;
 }
 
+// Long packet → several CAN frames → original packet
 static int test_sequence_error_resets_reassembly(void)
 {
     uint8_t packet[16] = {SPACECAN_SERVICE_HOUSEKEEPING, SPACECAN_HK_SUBTYPE_REPORT,
