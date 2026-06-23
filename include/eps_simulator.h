@@ -11,9 +11,16 @@ extern "C" {
 #endif
 
 #define EPS_SIMULATOR_NODE_ID 1u
+
+// Service 3 housekeeping payload format by bytes:
+// sequence(2), state(1), bus_voltage_mv(2), bus_current_ma(2),
+// battery_percent(1), temperature_cdeg(2), status_flags(1)
 #define EPS_HOUSEKEEPING_PAYLOAD_LEN 11u
+
 #define EPS_MAX_REPLY_FRAMES 4u
 
+// SAFE is reserved for future fault simulation
+// Current stage advances BOOT -> PRE_OPERATIONAL -> OPERATIONAL on SYNC ticks
 typedef enum {
     EPS_STATE_BOOT = 0,
     EPS_STATE_PRE_OPERATIONAL = 1,
@@ -21,6 +28,12 @@ typedef enum {
     EPS_STATE_SAFE = 3,
 } eps_state_t;
 
+// sequence - telemetry cycle number/SYNC tick count
+// bus_voltage_mv - bus voltage in millivolts
+// bus_current_ma - bus current in milliamps
+// battery_percent - battery percentage
+// temperature_cdeg - temperature in centi-degrees Celsius
+// status_flags - bitmask of status flags (see eps_status_flags_t)
 typedef struct {
     uint16_t sequence;
     uint16_t bus_voltage_mv;
@@ -40,12 +53,15 @@ typedef struct {
 const char *eps_state_name(eps_state_t state);
 void eps_simulator_init(eps_simulator_t *eps, uint8_t node_id);
 
+// Builds only housekeeping payload, SpaceCAN service/subtype header is added later
 spacecan_status_t eps_build_housekeeping_payload(const eps_measurements_t *measurements,
                                                  eps_state_t state,
                                                  uint8_t *out_payload,
                                                  size_t out_capacity,
                                                  size_t *out_len);
 
+// Main simulator step: accepts SYNC (0x080) and emits REP from node 1 (0x581)
+// Non-SYNC frames are rejected until later stages add command handling
 spacecan_status_t eps_simulator_accept_frame(eps_simulator_t *eps,
                                              const can_frame_t *incoming,
                                              can_frame_t *out_frames,

@@ -8,6 +8,7 @@
 #define EPS_FLAG_LOW_BATTERY 0x02u
 #define EPS_FLAG_OVERTEMP 0x04u
 
+// One SYNC acts as one simulator tick
 static eps_state_t next_state(eps_state_t state)
 {
     switch (state) {
@@ -22,6 +23,7 @@ static eps_state_t next_state(eps_state_t state)
     }
 }
 
+// Deterministic measurements for tests and future protocol vectors
 static eps_measurements_t generate_measurements(uint16_t sequence, eps_state_t state)
 {
     eps_measurements_t measurements;
@@ -47,6 +49,7 @@ static eps_measurements_t generate_measurements(uint16_t sequence, eps_state_t s
     return measurements;
 }
 
+// Stage 2 reacts only to broadcast SYNC frames
 static bool is_sync_frame(const can_frame_t *frame)
 {
     spacecan_id_t parsed;
@@ -100,6 +103,7 @@ spacecan_status_t eps_build_housekeeping_payload(const eps_measurements_t *measu
         return SPACECAN_ERR_BUFFER_TOO_SMALL;
     }
 
+    // Fixed-size big-endian wire format, no C struct layout on the bus
     spacecan_put_u16_be(&out_payload[0], measurements->sequence);
     out_payload[2] = (uint8_t)state;
     spacecan_put_u16_be(&out_payload[3], measurements->bus_voltage_mv);
@@ -135,6 +139,7 @@ spacecan_status_t eps_simulator_accept_frame(eps_simulator_t *eps,
     eps->sync_count = (uint16_t)(eps->sync_count + 1u);
     eps->state = next_state(eps->state);
 
+    // PRE_OPERATIONAL means the node is alive but does not publish telemetry yet
     if (eps->state != EPS_STATE_OPERATIONAL && eps->state != EPS_STATE_SAFE) {
         return SPACECAN_OK;
     }
@@ -150,6 +155,7 @@ spacecan_status_t eps_simulator_accept_frame(eps_simulator_t *eps,
         return status;
     }
 
+    // Service 3 / subtype 25 is the housekeeping report requested for Stage 2
     status = spacecan_packet_build(SPACECAN_SERVICE_HOUSEKEEPING,
                                    SPACECAN_HK_SUBTYPE_REPORT,
                                    payload,
@@ -161,6 +167,7 @@ spacecan_status_t eps_simulator_accept_frame(eps_simulator_t *eps,
         return status;
     }
 
+    // REPLY from node 1 gives CAN ID 0x581
     return spacecan_fragment_packet(SPACECAN_FRAME_REPLY,
                                     eps->node_id,
                                     packet,

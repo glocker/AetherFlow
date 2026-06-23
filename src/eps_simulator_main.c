@@ -48,6 +48,8 @@ int main(int argc, char **argv)
     }
 
     eps_simulator_init(&eps, EPS_SIMULATOR_NODE_ID);
+
+    // Stage 2 has no real transport yet, so this CLI creates synthetic SYNC frames
     if (!can_frame_init(&sync_frame, spacecan_make_can_id(SPACECAN_FRAME_SYNC, SPACECAN_NODE_BROADCAST), NULL, 0u, false)) {
         fputs("failed to create SYNC frame\n", stderr);
         return 1;
