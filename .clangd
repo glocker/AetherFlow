@@ -4,3 +4,4 @@ CompileFlags:
     - c
     - -std=c11
     - -Iinclude
+    - -IAetherFlow/include
