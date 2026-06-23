@@ -1,9 +1,14 @@
 # AetherFlow
 Demo to transfer data from CubeSat to OpenMCT based dashboard
 
+<h3>Summary</h3>
 ## CubeSat simulator
 Only sends data in SpaceCAN format
 (telemetry test parameters generator or real data)
+## Bridge service
+Converts SpaceCAN data to JSON
+## OpenMCT based dashboard
+Represents data on dashboard
 
 ### Stage 1: SpaceCAN codec
 
@@ -55,16 +60,11 @@ make eps_simulator
 
 The first `SYNC` moves EPS from `BOOT` to `PRE_OPERATIONAL`; the second and later `SYNC` events generate deterministic housekeeping measurements and fragment the report into SpaceCAN CAN frames.
 
-## Bridge service
-Converts SpaceCAN data to JSON
-## OpenMCT based dashboard
-Represents data on dashboard
-
 ## Roadmap
 
 Not implemented yet:
 
-1. Stage 3: memory or UDP transport for separate macOS processes (`controller_simulator`, `eps_simulator`, `bridge_service`, Open MCT).
-2. Stage 4: LibreCube compatibility vectors (`C → Python`, `Python → C`).
-3. Stage 5: Linux VM SocketCAN validation (`vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes).
-4. Stage 6: MCU/RTOS transports (`stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`).
+Stage 3: memory or UDP transport for separate macOS processes (`controller_simulator`, `eps_simulator`, `bridge_service`, Open MCT).
+Stage 4: LibreCube compatibility vectors (`C → Python`, `Python → C`).
+Stage 5: Linux VM SocketCAN validation (`vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes).
+Stage 6: MCU/RTOS transports (`stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`).
