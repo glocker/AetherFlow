@@ -51,7 +51,7 @@ Implemented as `eps_simulator` on top of the Stage 1 SpaceCAN codec.
 - output: SpaceCAN `REP` frames from node 1 (`0x581`)
 - telemetry packet: Service 3 housekeeping report (`service=3`, `subtype=25`)
 
-Run locally without adding a real transport yet:
+Synthetic/debug mode without a real transport is still available:
 
 ```sh
 make eps_simulator
@@ -60,11 +60,51 @@ make eps_simulator
 
 The first `SYNC` moves EPS from `BOOT` to `PRE_OPERATIONAL`; the second and later `SYNC` events generate deterministic housekeeping measurements and fragment the report into SpaceCAN CAN frames.
 
+### Stage 3: UDP multicast virtual CAN bus + C bridge service
+
+Implemented as separate macOS processes connected through a UDP multicast virtual CAN bus.
+
+- multicast group: `224.0.0.1`
+- UDP port: `40700`
+- wire format: stable `AFC1` CAN frame envelope, not raw C struct memory
+- `controller_simulator` publishes SpaceCAN/CAN `SYNC` frames (`0x080`)
+- `eps_simulator` listens for `SYNC` and publishes fragmented housekeeping `REPLY` frames (`0x581`)
+- `bridge_service` listens to the same bus, reassembles SpaceCAN packets, decodes EPS housekeeping telemetry and serves HTTP/WebSocket from C
+
+Build Stage 3:
+
+```sh
+make stage3
+```
+
+Run in separate terminals:
+
+```sh
+./bridge_service
+./eps_simulator
+./controller_simulator
+```
+
+Optional controller rate argument:
+
+```sh
+./controller_simulator 5
+```
+
+Bridge endpoints:
+
+```sh
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/telemetry/latest
+open http://127.0.0.1:8080/
+```
+
+The root page is a minimal live dashboard backed by WebSocket `/realtime`. It is intentionally small and dependency-free; the same C bridge-service boundary can later back a fuller Open MCT frontend.
+
 ## Roadmap
 
 Not implemented yet:
 
-Stage 3: memory or UDP transport for separate macOS processes (`controller_simulator`, `eps_simulator`, `bridge_service`, Open MCT).
 Stage 4: LibreCube compatibility vectors (`C → Python`, `Python → C`).
 Stage 5: Linux VM SocketCAN validation (`vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes).
 Stage 6: MCU/RTOS transports (`stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`).
