@@ -1,3 +1,4 @@
+// Enables macOS/BSD socket feature declarations used by C HTTP/WebSocket bridge
 #define _DARWIN_C_SOURCE
 
 #include "eps_simulator.h"
@@ -20,11 +21,13 @@
 #include <time.h>
 #include <unistd.h>
 
+// Public demo HTTP port for local bridge service, not a secret
 #define HTTP_PORT 8080u
 #define MAX_WS_CLIENTS 8u
 #define HTTP_REQUEST_MAX 2048u
 #define JSON_MAX 512u
 #define SHA1_DIGEST_LEN 20u
+// Fixed WebSocket GUID from RFC 6455, used to compute Sec-WebSocket-Accept
 #define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 static volatile sig_atomic_t keep_running = 1;
@@ -70,6 +73,7 @@ static uint32_t rol32(uint32_t value, unsigned int bits)
     return (value << bits) | (value >> (32u - bits));
 }
 
+// Compresses one 512-bit SHA-1 block for WebSocket accept-key calculation
 static void sha1_process_block(sha1_ctx_t *ctx, const uint8_t block[64])
 {
     uint32_t w[80];
@@ -130,6 +134,7 @@ static void sha1_process_block(sha1_ctx_t *ctx, const uint8_t block[64])
 
 static void sha1_init(sha1_ctx_t *ctx)
 {
+    // Standard SHA-1 initial hash values from SHA-1 specification
     ctx->state[0] = 0x67452301u;
     ctx->state[1] = 0xEFCDAB89u;
     ctx->state[2] = 0x98BADCFEu;
@@ -139,6 +144,7 @@ static void sha1_init(sha1_ctx_t *ctx)
     ctx->buffer_len = 0u;
 }
 
+// Streams arbitrary input into 64-byte SHA-1 blocks without dynamic allocation
 static void sha1_update(sha1_ctx_t *ctx, const uint8_t *data, size_t len)
 {
     size_t offset = 0u;
@@ -157,6 +163,7 @@ static void sha1_update(sha1_ctx_t *ctx, const uint8_t *data, size_t len)
     }
 }
 
+// Applies SHA-1 padding and writes 20-byte digest used by WebSocket handshake
 static void sha1_final(sha1_ctx_t *ctx, uint8_t digest[SHA1_DIGEST_LEN])
 {
     uint8_t pad = 0x80u;
@@ -182,6 +189,7 @@ static void sha1_final(sha1_ctx_t *ctx, uint8_t digest[SHA1_DIGEST_LEN])
     }
 }
 
+// Encodes SHA-1 digest into Sec-WebSocket-Accept header value
 static size_t base64_encode(const uint8_t *src, size_t len, char *out, size_t out_capacity)
 {
     static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -210,12 +218,14 @@ static size_t base64_encode(const uint8_t *src, size_t len, char *out, size_t ou
     return pos;
 }
 
+// Builds RFC 6455 accept key from browser-provided Sec-WebSocket-Key
 static void websocket_accept_key(const char *client_key, char *out, size_t out_capacity)
 {
     sha1_ctx_t sha1;
     uint8_t digest[SHA1_DIGEST_LEN];
     char combined[256];
 
+    // Browser WebSocket handshake formula: base64(sha1(client_key + RFC6455 GUID))
     snprintf(combined, sizeof(combined), "%s%s", client_key, WS_GUID);
     sha1_init(&sha1);
     sha1_update(&sha1, (const uint8_t *)combined, strlen(combined));
@@ -283,6 +293,7 @@ static int send_ws_text(int fd, const char *text)
     return -1;
 }
 
+// Opens small blocking HTTP listener used for health, JSON snapshot and WebSocket upgrade
 static int open_http_server(uint16_t port)
 {
     int fd;
@@ -371,6 +382,7 @@ static void broadcast_ws(int ws_clients[MAX_WS_CLIENTS], const char *json)
     compact_ws_clients(ws_clients);
 }
 
+// Converts decoded EPS snapshot into compact JSON shared by HTTP and WebSocket paths
 static void telemetry_to_json(telemetry_snapshot_t *telemetry)
 {
     snprintf(telemetry->json,
@@ -391,6 +403,7 @@ static void telemetry_to_json(telemetry_snapshot_t *telemetry)
              telemetry->timestamp_ms);
 }
 
+// Maps SpaceCAN service 3 subtype 25 payload bytes into named EPS telemetry fields
 static bool decode_eps_housekeeping(uint8_t node_id,
                                     const spacecan_packet_view_t *view,
                                     telemetry_snapshot_t *telemetry)

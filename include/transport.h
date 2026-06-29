@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+// Uses a local UDP multicast group as a virtual CAN bus
+// later may be replaced backend with SocketCAN or MCU CAN drivers while keeping can_frame_t unchanged
 #define AETHERFLOW_UDP_GROUP "224.0.0.1"
 #define AETHERFLOW_UDP_PORT 40700u
 
@@ -19,8 +21,8 @@ typedef enum {
 } transport_status_t;
 
 typedef struct {
-    int fd; // receive socket, intentionally public for select()-based services
-    int tx_fd;
+    int fd; // receive socket, intentionally public for select() based services
+    int tx_fd; // separate TX socket avoids macOS multicast send/receive edge cases
     struct {
         uint32_t addr_be;
         uint16_t port_be;

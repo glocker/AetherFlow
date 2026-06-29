@@ -1,3 +1,4 @@
+// Enables macOS/BSD socket feature declarations used by 3 UDP transport
 #define _DARWIN_C_SOURCE
 
 #include "transport.h"
@@ -60,6 +61,8 @@ transport_status_t udp_transport_open(udp_transport_t *transport,
     if (inet_pton(AF_INET, multicast_group, &group_addr) != 1) {
         return TRANSPORT_ERR;
     }
+    // Keep RX and TX sockets separate. On macOS, using one multicast-bound socket
+    // for both directions caused smoke test hangs around sendto() in local demos
     rx_fd = socket(AF_INET, SOCK_DGRAM, 0);
     tx_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (rx_fd < 0 || tx_fd < 0) {
@@ -76,12 +79,15 @@ transport_status_t udp_transport_open(udp_transport_t *transport,
         return TRANSPORT_ERR;
     }
 #ifdef SO_REUSEPORT
+    // macOS requires SO_REUSEPORT, in addition to SO_REUSEADDR, so several
+    // local processes can bind to the same multicast port and observe the bus
     if (setsockopt(rx_fd, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes)) != 0) {
         close_pair(rx_fd, tx_fd);
         return TRANSPORT_ERR;
     }
 #endif
 
+    // Loopback keeps the virtual CAN bus self-contained on the developer machine
     if (setsockopt(tx_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) != 0 ||
         setsockopt(tx_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)) != 0) {
         close_pair(rx_fd, tx_fd);

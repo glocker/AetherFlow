@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+// Stable wire envelope marker: "AFC1" = AetherFlow CAN frame format v1.
+// Do not send raw can_frame_t memory between processes; struct padding/layout is not portable.
 #define WIRE_MAGIC_0 'A'
 #define WIRE_MAGIC_1 'F'
 #define WIRE_MAGIC_2 'C'
