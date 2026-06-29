@@ -1,83 +1,213 @@
 # AetherFlow
-Demo to transfer data from CubeSat to OpenMCT based dashboard
 
-<h3>Summary</h3>
-## CubeSat simulator
-Only sends data in SpaceCAN format
-(telemetry test parameters generator or real data)
-## Bridge service
-Converts SpaceCAN data to JSON
-## OpenMCT based dashboard
-Represents data on dashboard
+AetherFlow is end-to-end CubeSat telemetry demo written around a transport independent SpaceCAN codec in C.
 
-### Stage 1: SpaceCAN codec
+Goal: show how embedded-style telemetry can move through a protocol stack into a ground-segment dashboard:
 
-Implemented as a transport-independent SpaceCAN codec in C.
+```text
+controller_simulator
+    └── SYNC CAN frame 0x080
+        └── UDP multicast virtual CAN bus
+            ├── eps_simulator
+            │   └── SpaceCAN REPLY frames 0x581 with EPS housekeeping telemetry
+            └── bridge_service
+                ├── SpaceCAN reassembly and parser
+                ├── EPS telemetry JSON
+                └── HTTP/WebSocket dashboard endpoint
+```
+
+Current demo runs as separate local macOS processes. UDP multicast acts as a virtual CAN bus for development. Later transports can replace it with SocketCAN, STM32 HAL, Zephyr CAN or FreeRTOS vendor CAN while keeping the SpaceCAN codec and simulator logic unchanged.
+
+## How it works
+
+### `controller_simulator`
+
+`controller_simulator` is a simple bus time source. It periodically publishes SpaceCAN/CAN `SYNC` frames:
+
+```text
+CAN ID: 0x080
+DLC: 0
+```
+
+EPS nodes react to these ticks. This mirrors a minimal spacecraft bus heartbeat without adding command handling yet.
+
+### `eps_simulator`
+
+`eps_simulator` represents an EPS node with node id `1`.
+
+It listens to the virtual CAN bus and feeds incoming frames into the existing EPS state machine:
+
+```text
+BOOT -> PRE_OPERATIONAL -> OPERATIONAL
+```
+
+After it reaches `OPERATIONAL`, every next `SYNC` produces deterministic housekeeping telemetry. That telemetry is packed as SpaceCAN service 3 subtype 25 and fragmented into CAN frames:
+
+```text
+CAN ID: 0x581
+service: 3
+subtype: 25
+payload: EPS housekeeping bytes
+```
+
+Synthetic mode still exists for quick codec/state-machine checks without transport.
+
+### UDP multicast virtual CAN bus
+
+Transport layer connects local processes through UDP multicast:
+
+```text
+multicast group: 224.0.0.1
+UDP port: 40700
+```
+
+Each UDP datagram contains one CAN frame encoded with `AFC1` wire envelope. This avoids sending raw C structs between processes, so padding, alignment and compiler layout do not become protocol details.
+
+`can_frame_t` stays as internal boundary between protocol code and transport backend:
+
+```text
+SpaceCAN codec <-> can_frame_t <-> UDP transport
+```
+
+This is the main reason later work can swap UDP for SocketCAN or MCU CAN drivers without rewriting the SpaceCAN parser or EPS logic.
+
+### `bridge_service`
+
+`bridge_service` listens to the same multicast bus as a passive ground-side receiver.
+
+It does four jobs:
+
+1. receives CAN frames from UDP bus
+2. reassembles fragmented SpaceCAN packets
+3. parses housekeeping reports `service=3 subtype=25`
+4. exposes decoded telemetry as JSON over HTTP and WebSocket
+
+Available bridge outputs:
+
+```text
+GET /health
+GET /telemetry/latest
+WebSocket /realtime
+GET / minimal live dashboard
+```
+
+The built-in dashboard is intentionally small and dependency-free. It proves the bridge boundary works before adding fuller Open MCT frontend integration.
+
+### WebSocket handshake code
+
+`bridge_service` includes small SHA-1 and Base64 helpers only for WebSocket upgrade handshake:
+
+```text
+Sec-WebSocket-Accept = base64(sha1(client_key + RFC6455_GUID))
+```
+
+Constants like `0x67452301u` are standard SHA-1 algorithm constants. `258EAFA5-E914-47DA-95CA-C5AB0DC85B11` is fixed WebSocket RFC 6455 GUID. They are public protocol constants.
+
+## Protocol pieces
+
+### SpaceCAN codec
+
+Implemented as transport-independent C code:
 
 - builds application packets from `service`, `subtype` and payload bytes
-- parses SpaceCAN packets back into service/subtype/payload views
-- calculates CAN arbitration IDs for `SYNC`, `REQUEST`, `REPLY` and `HEARTBEAT`
+- parses SpaceCAN packets back into views
+- calculates CAN arbitration IDs
 - fragments packets into standard 8-byte CAN frames
-- reassembles single-frame and multi-frame SpaceCAN packets
-- uses big-endian integer helpers for future C ↔ Python compatibility checks
+- reassembles single-frame and multi-frame packets
+- uses big-endian integer helpers for C ↔ Python compatibility checks
 
-Important IDs used by the codec:
+Important CAN IDs:
 
-- `SYNC`: `0x080`
-- `REQUEST` from node 1: `0x601`
-- `REPLY` from node 1: `0x581`
-- `HEARTBEAT` from node 1: `0x701`
-
-Run codec tests:
-
-```sh
-make tests/test_spacecan_codec
-./tests/test_spacecan_codec
+```text
+SYNC      0x080
+REQUEST   0x600 + node_id
+REPLY     0x580 + node_id
+HEARTBEAT 0x700 + node_id
 ```
 
-Or run the whole current test suite:
+For EPS node `1`:
 
-```sh
-make test
+```text
+REPLY 0x581
+REQUEST 0x601
+HEARTBEAT 0x701
 ```
 
-### Stage 2: EPS simulator
+### EPS housekeeping payload
 
-Implemented as `eps_simulator` on top of the Stage 1 SpaceCAN codec.
+Current EPS telemetry payload is fixed-size and big-endian:
 
-- node id: `1`
-- states: `BOOT`, `PRE_OPERATIONAL`, `OPERATIONAL`, `SAFE`
-- input: SpaceCAN `SYNC` frame (`0x080`)
-- output: SpaceCAN `REP` frames from node 1 (`0x581`)
-- telemetry packet: Service 3 housekeeping report (`service=3`, `subtype=25`)
-
-Synthetic/debug mode without a real transport is still available:
-
-```sh
-make eps_simulator
-./eps_simulator 5
+```text
+sequence              uint16
+state                 uint8
+bus_voltage_mv        uint16
+bus_current_ma        int16
+battery_percent       uint8
+temperature_cdeg      int16
+status_flags          uint8
 ```
 
-The first `SYNC` moves EPS from `BOOT` to `PRE_OPERATIONAL`; the second and later `SYNC` events generate deterministic housekeeping measurements and fragment the report into SpaceCAN CAN frames.
+This fixed layout is useful for future compatibility vectors against Python/LibreCube tooling.
 
-### Stage 3: UDP multicast virtual CAN bus + C bridge service
+### `AFC1` CAN frame envelope
 
-Implemented as separate macOS processes connected through a UDP multicast virtual CAN bus.
+UDP transport uses explicit wire encoding:
 
-- multicast group: `224.0.0.1`
-- UDP port: `40700`
-- wire format: stable `AFC1` CAN frame envelope, not raw C struct memory
-- `controller_simulator` publishes SpaceCAN/CAN `SYNC` frames (`0x080`)
-- `eps_simulator` listens for `SYNC` and publishes fragmented housekeeping `REPLY` frames (`0x581`)
-- `bridge_service` listens to the same bus, reassembles SpaceCAN packets, decodes EPS housekeeping telemetry and serves HTTP/WebSocket from C
+```text
+magic[4]   = AFC1
+version[1]
+flags[1]
+id[4]      = big-endian CAN arbitration ID
+dlc[1]
+data[8]
+```
 
-Build Stage 3:
+This keeps transport packets stable even if C compiler, platform or struct layout changes.
+
+## Current architecture
+
+```text
+include/
+  can_frame.h             CAN frame model
+  can_frame_wire.h        AFC1 wire envelope API
+  eps_simulator.h         EPS node API
+  spacecan.h              SpaceCAN codec API
+  spacecan_services.h     service/subtype constants
+  transport.h             UDP transport API and defaults
+
+src/
+  controller_simulator_main.c
+  eps_simulator_main.c
+  bridge_service_main.c
+  can_frame_wire.c
+  eps_simulator.c
+  spacecan_*.c
+
+transport/
+  udp_transport.c         current macOS local virtual CAN bus
+  memory_transport.c      reserved future backend
+  socketcan_transport.c   reserved Linux SocketCAN backend
+
+tests/
+  test_spacecan_codec.c
+  test_eps_simulator.c
+```
+
+## Build and run
+
+Build everything and run tests:
+
+```sh
+make all
+```
+
+Build only demo binaries:
 
 ```sh
 make stage3
 ```
 
-Run in separate terminals:
+Run separate processes in separate terminals:
 
 ```sh
 ./bridge_service
@@ -91,7 +221,7 @@ Optional controller rate argument:
 ./controller_simulator 5
 ```
 
-Bridge endpoints:
+Check bridge output:
 
 ```sh
 curl http://127.0.0.1:8080/health
@@ -99,12 +229,39 @@ curl http://127.0.0.1:8080/telemetry/latest
 open http://127.0.0.1:8080/
 ```
 
-The root page is a minimal live dashboard backed by WebSocket `/realtime`. It is intentionally small and dependency-free; the same C bridge-service boundary can later back a fuller Open MCT frontend.
+Synthetic EPS mode without UDP transport:
+
+```sh
+make eps_simulator
+./eps_simulator 5
+```
+
+Run codec tests directly:
+
+```sh
+make tests/test_spacecan_codec
+./tests/test_spacecan_codec
+```
+
+Run current test suite:
+
+```sh
+make test
+```
+
+## Development notes
+
+- UDP multicast transport is tuned for local macOS demo runs
+- `SO_REUSEPORT` is used so multiple local processes can observe same multicast port
+- RX and TX UDP sockets are separate to avoid macOS multicast send/receive edge cases found during smoke tests
+- hardcoded IP/port values are just public demo defaults
+- WebSocket SHA-1 code exists only for RFC 6455 handshake, not for cryptographic security
+- Open MCT integration can sit behind existing `bridge_service` HTTP/WebSocket boundary
 
 ## Roadmap
 
 Not implemented yet:
 
-Stage 4: LibreCube compatibility vectors (`C → Python`, `Python → C`).
-Stage 5: Linux VM SocketCAN validation (`vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes).
-Stage 6: MCU/RTOS transports (`stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`).
+- LibreCube compatibility vectors: `C -> Python`, `Python -> C`
+- Linux VM SocketCAN validation: `vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes
+- MCU/RTOS transports: `stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`
