@@ -26,9 +26,9 @@ EPS_SIMULATOR_BIN := eps_simulator
 BRIDGE_SERVICE_BIN := bridge_service
 STAGE3_BINS := $(CONTROLLER_SIMULATOR_BIN) $(EPS_SIMULATOR_BIN) $(BRIDGE_SERVICE_BIN)
 
-.PHONY: all test clean stage3 vectors
+.PHONY: all test clean stage3 vectors compat compat-python
 
-all: test stage3
+all: test stage3 compat
 
 stage3: $(STAGE3_BINS)
 
@@ -45,6 +45,11 @@ $(VECTOR_FILE): $(VECTOR_GENERATOR_BIN)
 	./$(VECTOR_GENERATOR_BIN) > $(VECTOR_FILE)
 
 vectors: $(VECTOR_FILE)
+
+compat-python: $(VECTOR_FILE)
+	python3 compat/python/check_vectors.py $(VECTOR_FILE)
+
+compat: compat-python
 
 $(CONTROLLER_SIMULATOR_BIN): src/controller_simulator_main.c $(SPACECAN_SRCS) $(TRANSPORT_SRCS) include/can_frame.h include/can_frame_wire.h include/spacecan.h include/transport.h
 	$(CC) $(CFLAGS) src/controller_simulator_main.c $(SPACECAN_SRCS) $(TRANSPORT_SRCS) -o $@
