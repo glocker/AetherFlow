@@ -45,6 +45,8 @@ static void print_hex_bytes(const uint8_t *data, size_t len)
 {
     size_t i;
 
+    // Hex strings keep vectors language neutral and diff friendly
+
     for (i = 0u; i < len; ++i) {
         printf("%02x", data[i]);
     }
@@ -65,6 +67,7 @@ static void print_vector(const vector_case_t *test_case, bool comma)
     size_t frame_count = 0u;
     size_t i;
 
+    // Generate bytes through production C codec instead of hand-written fixtures
     require_status(spacecan_packet_build(test_case->service,
                                          test_case->subtype,
                                          test_case->payload,
@@ -126,6 +129,7 @@ int main(void)
     vector_case_t cases[3];
     size_t i;
 
+    // Deterministic EPS sample locks endian layout used by bridge and future Python checks
     require_status(eps_build_housekeeping_payload(&measurements,
                                                   EPS_STATE_OPERATIONAL,
                                                   eps_payload,
@@ -133,6 +137,7 @@ int main(void)
                                                   &eps_payload_len),
                    "eps_build_housekeeping_payload");
 
+    // Single-frame vector covers simplest request path without reassembly state
     cases[0].name = "parameter_get_request_single_frame";
     cases[0].description = "Small service 4/subtype 1 request from node 1; packet fits in one CAN frame.";
     cases[0].frame_class = SPACECAN_FRAME_REQUEST;
@@ -142,6 +147,7 @@ int main(void)
     cases[0].payload = parameter_get_payload;
     cases[0].payload_len = sizeof(parameter_get_payload);
 
+    // EPS vector represents telemetry path used by live demo
     cases[1].name = "eps_housekeeping_reply_node_1";
     cases[1].description = "Deterministic EPS housekeeping report matching the Stage 3 simulator layout.";
     cases[1].frame_class = SPACECAN_FRAME_REPLY;
@@ -151,6 +157,7 @@ int main(void)
     cases[1].payload = eps_payload;
     cases[1].payload_len = eps_payload_len;
 
+    // Long payload vector locks FIRST CONSECUTIVE LAST fragmentation semantics
     cases[2].name = "housekeeping_long_payload_fragmentation";
     cases[2].description = "20-byte payload used to lock multi-frame fragmentation and reassembly semantics.";
     cases[2].frame_class = SPACECAN_FRAME_REPLY;
