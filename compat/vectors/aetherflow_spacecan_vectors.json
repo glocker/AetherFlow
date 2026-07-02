@@ -1,0 +1,81 @@
+{
+  "schema": "aetherflow.spacecan.vectors.v1",
+  "dialect": "AetherFlow SpaceCAN dialect v1",
+  "producer": "tools/generate_spacecan_vectors.c",
+  "vectors": [
+    {
+      "name": "parameter_get_request_single_frame",
+      "description": "Small service 4/subtype 1 request from node 1; packet fits in one CAN frame.",
+      "frame_class": "request",
+      "node_id": 1,
+      "can_id": "0x601",
+      "service": 20,
+      "subtype": 1,
+      "payload_hex": "10",
+      "packet_hex": "140110",
+      "frames": [
+        {
+          "id": "0x601",
+          "dlc": 4,
+          "data_hex": "00140110"
+        }
+      ]
+    },
+    {
+      "name": "eps_housekeeping_reply_node_1",
+      "description": "Deterministic EPS housekeeping report matching the Stage 3 simulator layout.",
+      "frame_class": "reply",
+      "node_id": 1,
+      "can_id": "0x581",
+      "service": 3,
+      "subtype": 25,
+      "payload_hex": "000202138e01ae54097000",
+      "packet_hex": "0319000202138e01ae54097000",
+      "frames": [
+        {
+          "id": "0x581",
+          "dlc": 8,
+          "data_hex": "400d031900020213"
+        },
+        {
+          "id": "0x581",
+          "dlc": 8,
+          "data_hex": "c18e01ae54097000"
+        }
+      ]
+    },
+    {
+      "name": "housekeeping_long_payload_fragmentation",
+      "description": "20-byte payload used to lock multi-frame fragmentation and reassembly semantics.",
+      "frame_class": "reply",
+      "node_id": 1,
+      "can_id": "0x581",
+      "service": 3,
+      "subtype": 25,
+      "payload_hex": "0102030405060708090a0b0c0d0e0f1011121314",
+      "packet_hex": "03190102030405060708090a0b0c0d0e0f1011121314",
+      "frames": [
+        {
+          "id": "0x581",
+          "dlc": 8,
+          "data_hex": "4016031901020304"
+        },
+        {
+          "id": "0x581",
+          "dlc": 8,
+          "data_hex": "8105060708090a0b"
+        },
+        {
+          "id": "0x581",
+          "dlc": 8,
+          "data_hex": "820c0d0e0f101112"
+        },
+        {
+          "id": "0x581",
+          "dlc": 3,
+          "data_hex": "c31314"
+        }
+      ]
+    }
+  ]
+}

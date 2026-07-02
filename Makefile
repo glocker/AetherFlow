@@ -18,12 +18,15 @@ TEST_BINS := \
 	tests/test_spacecan_codec \
 	tests/test_eps_simulator
 
+VECTOR_GENERATOR_BIN := tools/generate_spacecan_vectors
+VECTOR_FILE := compat/vectors/aetherflow_spacecan_vectors.json
+
 CONTROLLER_SIMULATOR_BIN := controller_simulator
 EPS_SIMULATOR_BIN := eps_simulator
 BRIDGE_SERVICE_BIN := bridge_service
 STAGE3_BINS := $(CONTROLLER_SIMULATOR_BIN) $(EPS_SIMULATOR_BIN) $(BRIDGE_SERVICE_BIN)
 
-.PHONY: all test clean stage3
+.PHONY: all test clean stage3 vectors
 
 all: test stage3
 
@@ -34,6 +37,14 @@ tests/test_spacecan_codec: tests/test_spacecan_codec.c $(SPACECAN_SRCS) include/
 
 tests/test_eps_simulator: tests/test_eps_simulator.c $(SPACECAN_SRCS) $(EPS_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h
 	$(CC) $(CFLAGS) tests/test_eps_simulator.c $(SPACECAN_SRCS) $(EPS_SRCS) -o $@
+
+$(VECTOR_GENERATOR_BIN): tools/generate_spacecan_vectors.c $(SPACECAN_SRCS) $(EPS_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h
+	$(CC) $(CFLAGS) tools/generate_spacecan_vectors.c $(SPACECAN_SRCS) $(EPS_SRCS) -o $@
+
+$(VECTOR_FILE): $(VECTOR_GENERATOR_BIN)
+	./$(VECTOR_GENERATOR_BIN) > $(VECTOR_FILE)
+
+vectors: $(VECTOR_FILE)
 
 $(CONTROLLER_SIMULATOR_BIN): src/controller_simulator_main.c $(SPACECAN_SRCS) $(TRANSPORT_SRCS) include/can_frame.h include/can_frame_wire.h include/spacecan.h include/transport.h
 	$(CC) $(CFLAGS) src/controller_simulator_main.c $(SPACECAN_SRCS) $(TRANSPORT_SRCS) -o $@
@@ -49,4 +60,4 @@ test: $(TEST_BINS)
 	./tests/test_eps_simulator
 
 clean:
-	rm -f $(TEST_BINS) $(STAGE3_BINS)
+	rm -f $(TEST_BINS) $(STAGE3_BINS) $(VECTOR_GENERATOR_BIN)
