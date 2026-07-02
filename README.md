@@ -249,6 +249,22 @@ Run current test suite:
 make test
 ```
 
+Generate and validate Stage 4 compatibility vectors:
+
+```sh
+make vectors
+make compat
+```
+
+`make compat` validates the current C-generated SpaceCAN vectors with a dependency-free Python reference harness. This checks both directions at byte level:
+
+```text
+C → Python: parse/reassemble C-generated packets and frames
+Python → C: independently re-encode the same scenarios and compare exact bytes
+```
+
+Details are documented in `compat/README.md`.
+
 ## Development notes
 
 - UDP multicast transport is tuned for local macOS demo runs
@@ -260,8 +276,12 @@ make test
 
 ## Roadmap
 
+Implemented foundations:
+
+- Stage 4 compatibility vectors and Python harness: `C -> Python`, `Python -> C`
+
 Not implemented yet:
 
-- LibreCube compatibility vectors: `C -> Python`, `Python -> C`
+- concrete adapter for upstream `python-spacecan` / `micropython-spacecan` API
 - Linux VM SocketCAN validation: `vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes
 - MCU/RTOS transports: `stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`
