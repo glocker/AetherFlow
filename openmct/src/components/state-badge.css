@@ -1,0 +1,27 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  color: var(--state-color, var(--dashboard-unknown));
+  font: inherit;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 10px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

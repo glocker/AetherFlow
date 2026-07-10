@@ -35,7 +35,7 @@ build: backend
 backend: $(BACKEND_BINS)
 
 dashboard-install:
-	npm install --prefix openmct
+	npm ci --prefix openmct
 
 dashboard-dev:
 	npm --prefix openmct run dev
