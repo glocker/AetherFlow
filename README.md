@@ -195,13 +195,13 @@ tests/
 
 ## Build and run
 
-Run the full local demo:
+Run full local demo:
 
 ```sh
 make demo
 ```
 
-This builds the backend services, installs OpenMCT dashboard dependencies, starts the bridge, EPS simulator, controller simulator and dashboard dev server, then prints the dashboard URL:
+This builds all needed backend services (bridge, EPS simulator, controller simulator), installs OpenMCT dashboard dependencies and runs dashboard dev server, then prints dashboard URL:
 
 ```text
 http://127.0.0.1:5173/
@@ -229,13 +229,13 @@ Build only backend service binaries:
 make backend
 ```
 
-Run the OpenMCT based dashboard separately:
+Run OpenMCT based dashboard separately:
 
 ```sh
 make dashboard-dev
 ```
 
-Build or preview the dashboard production bundle:
+Build or preview dashboard production bundle:
 
 ```sh
 make dashboard-build
