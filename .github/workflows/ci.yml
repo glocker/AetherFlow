@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: openmct/package-lock.json
+
+      - name: Tool versions
+        run: |
+          cc --version || true
+          python3 --version
+          node --version
+          npm --version
+
+      - name: C tests
+        run: make test
+
+      - name: Backend build
+        run: make backend
+
+      - name: Compatibility vectors
+        run: make compat
+
+      - name: Dashboard dependencies
+        run: npm ci --prefix openmct
+
+      - name: Dashboard build
+        run: make dashboard-build
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Check shell scripts
+        run: shellcheck tools/*.sh
