@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static volatile sig_atomic_t keep_running = 1;
 
@@ -141,7 +142,7 @@ static int run_udp(void)
                (unsigned int)reply_count);
         for (i = 0u; i < reply_count; ++i) {
             if (udp_transport_send(&transport, &reply_frames[i]) != TRANSPORT_OK) {
-                fputs("eps_simulator: failed to send reply frame\n", stderr);
+                fprintf(stderr, "eps_simulator: failed to send reply frame: %s\n", strerror(errno));
                 udp_transport_close(&transport);
                 return 1;
             }

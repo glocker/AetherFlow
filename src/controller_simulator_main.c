@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static volatile sig_atomic_t keep_running = 1;
@@ -83,7 +84,7 @@ int main(int argc, char **argv)
 
     while (keep_running) {
         if (udp_transport_send(&transport, &sync_frame) != TRANSPORT_OK) {
-            fputs("controller_simulator: failed to send SYNC\n", stderr);
+            fprintf(stderr, "controller_simulator: failed to send SYNC: %s\n", strerror(errno));
             udp_transport_close(&transport);
             return 1;
         }

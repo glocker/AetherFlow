@@ -252,7 +252,7 @@ static int send_http_response(int fd, const char *content_type, const char *body
     char header[256];
     int header_len = snprintf(header,
                               sizeof(header),
-                              "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %u\r\nConnection: close\r\n\r\n",
+                              "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: %u\r\nConnection: close\r\n\r\n",
                               content_type,
                               (unsigned int)strlen(body));
     if (header_len < 0 || (size_t)header_len >= sizeof(header)) {

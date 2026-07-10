@@ -49,6 +49,7 @@ transport_status_t udp_transport_open(udp_transport_t *transport,
     struct sockaddr_in bind_addr;
     struct ip_mreq membership;
     struct in_addr group_addr;
+    struct in_addr loopback_addr;
 
     if (transport == NULL || multicast_group == NULL || port == 0u) {
         return TRANSPORT_ERR;
@@ -58,7 +59,7 @@ transport_status_t udp_transport_open(udp_transport_t *transport,
     transport->fd = -1;
     transport->tx_fd = -1;
 
-    if (inet_pton(AF_INET, multicast_group, &group_addr) != 1) {
+    if (inet_pton(AF_INET, multicast_group, &group_addr) != 1 || inet_pton(AF_INET, "127.0.0.1", &loopback_addr) != 1) {
         return TRANSPORT_ERR;
     }
     // Keep RX and TX sockets separate. On macOS, using one multicast-bound socket
@@ -87,8 +88,11 @@ transport_status_t udp_transport_open(udp_transport_t *transport,
     }
 #endif
 
-    // Loopback keeps the virtual CAN bus self-contained on the developer machine
-    if (setsockopt(tx_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) != 0 ||
+    // Loopback keeps the virtual CAN bus self-contained on macOS
+    // Pinning multicast TX/RX membership to lo0 avoids macOS route selection failures
+    // where sendto() can fail before any simulator receives a SYNC frame
+    if (setsockopt(tx_fd, IPPROTO_IP, IP_MULTICAST_IF, &loopback_addr, sizeof(loopback_addr)) != 0 ||
+        setsockopt(tx_fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) != 0 ||
         setsockopt(tx_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)) != 0) {
         close_pair(rx_fd, tx_fd);
         return TRANSPORT_ERR;
@@ -105,7 +109,7 @@ transport_status_t udp_transport_open(udp_transport_t *transport,
 
     memset(&membership, 0, sizeof(membership));
     membership.imr_multiaddr = group_addr;
-    membership.imr_interface.s_addr = htonl(INADDR_ANY);
+    membership.imr_interface = loopback_addr;
     if (setsockopt(rx_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &membership, sizeof(membership)) != 0) {
         close_pair(rx_fd, tx_fd);
         return TRANSPORT_ERR;
