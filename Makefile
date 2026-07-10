@@ -24,13 +24,30 @@ VECTOR_FILE := compat/vectors/aetherflow_spacecan_vectors.json
 CONTROLLER_SIMULATOR_BIN := controller_simulator
 EPS_SIMULATOR_BIN := eps_simulator
 BRIDGE_SERVICE_BIN := bridge_service
-STAGE3_BINS := $(CONTROLLER_SIMULATOR_BIN) $(EPS_SIMULATOR_BIN) $(BRIDGE_SERVICE_BIN)
+BACKEND_BINS := $(CONTROLLER_SIMULATOR_BIN) $(EPS_SIMULATOR_BIN) $(BRIDGE_SERVICE_BIN)
 
-.PHONY: all test clean stage3 vectors compat compat-python
+.PHONY: all build backend dashboard-install dashboard-dev dashboard-build dashboard-preview demo test clean vectors compat compat-python
 
-all: test stage3 compat
+all: test backend compat
 
-stage3: $(STAGE3_BINS)
+build: backend
+
+backend: $(BACKEND_BINS)
+
+dashboard-install:
+	npm install --prefix openmct
+
+dashboard-dev:
+	npm --prefix openmct run dev
+
+dashboard-build:
+	npm --prefix openmct run build
+
+dashboard-preview:
+	npm --prefix openmct run preview
+
+demo: backend dashboard-install
+	./tools/run_demo.sh
 
 tests/test_spacecan_codec: tests/test_spacecan_codec.c $(SPACECAN_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h
 	$(CC) $(CFLAGS) tests/test_spacecan_codec.c $(SPACECAN_SRCS) -o $@
@@ -65,4 +82,4 @@ test: $(TEST_BINS)
 	./tests/test_eps_simulator
 
 clean:
-	rm -f $(TEST_BINS) $(STAGE3_BINS) $(VECTOR_GENERATOR_BIN)
+	rm -f $(TEST_BINS) $(BACKEND_BINS) $(VECTOR_GENERATOR_BIN)

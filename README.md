@@ -195,29 +195,63 @@ tests/
 
 ## Build and run
 
+Run the full local demo:
+
+```sh
+make demo
+```
+
+This builds the backend services, installs OpenMCT dashboard dependencies, starts the bridge, EPS simulator, controller simulator and dashboard dev server, then prints the dashboard URL:
+
+```text
+http://127.0.0.1:5173/
+```
+
+Logs are written to `logs/`. Press `Ctrl+C` in the `make demo` terminal to stop all demo processes.
+
+Useful environment overrides:
+
+```sh
+AETHERFLOW_CONTROLLER_RATE_HZ=10 make demo
+AETHERFLOW_BRIDGE_URL=http://127.0.0.1:8080 make demo
+AETHERFLOW_DASHBOARD_URL=http://127.0.0.1:5173 make demo
+```
+
 Build everything and run tests:
 
 ```sh
 make all
 ```
 
-Build only demo binaries:
+Build only backend service binaries:
 
 ```sh
-make stage3
+make backend
 ```
 
-Run separate processes in separate terminals:
+Run the OpenMCT based dashboard separately:
 
 ```sh
+make dashboard-dev
+```
+
+Build or preview the dashboard production bundle:
+
+```sh
+make dashboard-build
+make dashboard-preview
+```
+
+The dashboard connects to `http://127.0.0.1:8080` by default. To point it at another bridge endpoint, pass `?bridge=http://host:port` in the dashboard URL.
+
+### Manual mode for debugging
+
+Use this when you want each service in its own terminal:
+
+```sh
+make backend
 ./bridge_service
 ./eps_simulator
-./controller_simulator
-```
-
-Optional controller rate argument:
-
-```sh
 ./controller_simulator 5
 ```
 
