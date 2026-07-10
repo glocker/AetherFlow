@@ -1,0 +1,20 @@
+# C build outputs
+/bridge_service
+/controller_simulator
+/eps_simulator
+/tests/test_spacecan_codec
+/tests/test_eps_simulator
+/tools/generate_spacecan_vectors
+
+# Runtime artifacts
+/logs/
+*.log
+*.pid
+
+# Frontend dependencies and build outputs
+node_modules/
+openmct/node_modules/
+openmct/dist/
+
+# OS/editor noise
+.DS_Store
