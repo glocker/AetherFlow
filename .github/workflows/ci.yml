@@ -1,9 +1,17 @@
 name: CI
 
+# Temporarily disabled for auto pushes/PRs.
+#
+# Remove next comments to enable:
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#   workflow_dispatch:
+
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
