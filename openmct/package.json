@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "OpenMCT based dashboard for AetherFlow EPS telemetry stream",
+  "description": "OpenMCT based dashboard",
   "scripts": {
     "dev": "node scripts/serve.js --build --host 127.0.0.1 --port 5173",
     "build": "node scripts/build-cli.js",
