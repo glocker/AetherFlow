@@ -3,18 +3,7 @@
 AetherFlow is end-to-end CubeSat telemetry demo written around a transport independent SpaceCAN codec in C.
 
 Goal: show how embedded-style telemetry can move through a protocol stack into a ground-segment dashboard:
-
-```text
-controller_simulator
-    └── SYNC CAN frame 0x080
-        └── UDP multicast virtual CAN bus
-            ├── eps_simulator
-            │   └── SpaceCAN REPLY frames 0x581 with EPS housekeeping telemetry
-            └── bridge_service
-                ├── SpaceCAN reassembly and parser
-                ├── EPS telemetry JSON
-                └── HTTP/WebSocket dashboard endpoint
-```
+![Project scheme](https://github.com/glocker/AetherFlow/blob/3d5ac8aa0df2bd974a6bb89b74e3de859b6f5f61/Scheme.png)
 
 Current demo runs as separate local macOS processes. UDP multicast acts as a virtual CAN bus for development. Later transports can replace it with SocketCAN, STM32 HAL, Zephyr CAN or FreeRTOS vendor CAN while keeping the SpaceCAN codec and simulator logic unchanged.
 
