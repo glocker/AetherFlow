@@ -233,6 +233,44 @@ make dashboard-preview
 
 The dashboard connects to `http://127.0.0.1:8080` by default. To point it at another bridge endpoint, pass `?bridge=http://host:port` in the dashboard URL.
 
+### Docker demo
+
+Build and run the complete Linux demo in Docker:
+
+```sh
+docker compose up --build
+```
+
+The Docker image is based on `debian:bookworm-slim`. During image build it runs the same verification/build pipeline as local Linux:
+
+```sh
+make clean
+make test
+make backend
+make compat
+npm ci --prefix openmct
+make dashboard-build
+```
+
+After the container starts, open:
+
+```text
+http://127.0.0.1:5173/
+```
+
+Bridge API is exposed on:
+
+```text
+http://127.0.0.1:8080/health
+http://127.0.0.1:8080/telemetry/latest
+```
+
+Stop the demo with `Ctrl+C`, or from another terminal:
+
+```sh
+docker compose down
+```
+
 ### Manual mode for debugging
 
 Use this when you want each service in its own terminal:

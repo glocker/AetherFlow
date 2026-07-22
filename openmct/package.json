@@ -5,9 +5,9 @@
   "type": "module",
   "description": "OpenMCT based dashboard",
   "scripts": {
-    "dev": "node scripts/serve.js --build --host 127.0.0.1 --port 5173",
+    "dev": "node scripts/serve.js --build",
     "build": "node scripts/build-cli.js",
-    "preview": "node scripts/serve.js --host 127.0.0.1 --port 5173"
+    "preview": "node scripts/serve.js"
   },
   "dependencies": {
     "openmct": "^4.2.0"

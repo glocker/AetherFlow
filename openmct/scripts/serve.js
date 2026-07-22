@@ -79,8 +79,8 @@ async function serveFile(request, response) {
 
 async function main() {
   const shouldBuild = process.argv.includes('--build');
-  const host = optionValue('--host', '127.0.0.1');
-  const port = Number(optionValue('--port', '5173'));
+  const host = optionValue('--host', process.env.AETHERFLOW_DASHBOARD_HOST || '127.0.0.1');
+  const port = Number(optionValue('--port', process.env.AETHERFLOW_DASHBOARD_PORT || '5173'));
 
   if (shouldBuild) {
     await buildDashboard({ minify: false });

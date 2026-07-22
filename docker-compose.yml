@@ -1,0 +1,19 @@
+services:
+  aetherflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aetherflow:local
+    ports:
+      - "8080:8080"
+      - "5173:5173"
+    environment:
+      AETHERFLOW_BRIDGE_URL: http://127.0.0.1:8080
+      AETHERFLOW_DASHBOARD_HOST: 0.0.0.0
+      AETHERFLOW_DASHBOARD_URL: http://127.0.0.1:5173
+      AETHERFLOW_CONTROLLER_RATE_HZ: 5
+    volumes:
+      - aetherflow-logs:/app/logs
+
+volumes:
+  aetherflow-logs:
