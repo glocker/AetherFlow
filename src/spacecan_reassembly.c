@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+_Static_assert(SPACECAN_PACKET_MAX_SIZE <= UINT8_MAX, "SpaceCAN packet length must fit in one byte");
+
 #define SPACECAN_FRAGMENT_KIND_SHIFT 6u
 #define SPACECAN_FRAGMENT_SEQ_MASK 0x3Fu
 #define SPACECAN_SINGLE_PAYLOAD_CAPACITY 7u
@@ -94,7 +96,7 @@ spacecan_status_t spacecan_reassembly_accept(spacecan_reassembly_t *state,
             return SPACECAN_ERR_INVALID_FRAME;
         }
         total_len = frame->data[1];
-        if (total_len <= SPACECAN_SINGLE_PAYLOAD_CAPACITY || total_len > SPACECAN_PACKET_MAX_SIZE) {
+        if (total_len <= SPACECAN_SINGLE_PAYLOAD_CAPACITY) {
             return SPACECAN_ERR_INVALID_FRAME;
         }
 
