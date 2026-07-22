@@ -1,4 +1,5 @@
-// Enables macOS/BSD socket feature declarations used by C HTTP/WebSocket bridge
+// Enables POSIX/macOS socket and clock feature declarations used by C HTTP/WebSocket bridge
+#define _POSIX_C_SOURCE 200112L
 #define _DARWIN_C_SOURCE
 
 #include "eps_simulator.h"

@@ -1,3 +1,6 @@
+// We need define source to use nanosleep because of strict -std=c11
+#define _POSIX_C_SOURCE 199309L
+
 #include "spacecan.h"
 #include "transport.h"
 

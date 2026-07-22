@@ -1,4 +1,5 @@
-// Enables macOS/BSD socket feature declarations used by 3 UDP transport
+// Enables POSIX/BSD socket feature declarations used by UDP transport
+#define _DEFAULT_SOURCE
 #define _DARWIN_C_SOURCE
 
 #include "transport.h"
