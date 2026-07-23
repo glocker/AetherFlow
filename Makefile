@@ -47,7 +47,7 @@ dashboard-preview:
 	npm --prefix openmct run preview
 
 demo: backend dashboard-install
-	./tools/run_demo.sh
+	./tools/run_local_demo.sh
 
 tests/test_spacecan_codec: tests/test_spacecan_codec.c $(SPACECAN_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h
 	$(CC) $(CFLAGS) tests/test_spacecan_codec.c $(SPACECAN_SRCS) -o $@

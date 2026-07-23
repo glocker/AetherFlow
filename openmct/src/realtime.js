@@ -6,10 +6,7 @@ const DEFAULT_HTTP_LATEST_PATH = "/telemetry/latest";
 
 function bridgeBaseUrl() {
   const params = new URLSearchParams(window.location.search);
-  return (
-    params.get("bridge") ||
-    `${window.location.protocol}//${window.location.hostname}:8080`
-  );
+  return params.get("bridge") || window.location.origin;
 }
 
 function wsUrlFromBase(baseUrl) {

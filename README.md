@@ -244,25 +244,28 @@ docker compose up --build
 The Docker image is based on `debian:bookworm-slim`. During image build it runs the same verification/build pipeline as local Linux:
 
 ```sh
+npm ci --prefix openmct
 make clean
 make test
 make backend
 make compat
-npm ci --prefix openmct
 make dashboard-build
 ```
+
+Hosted Docker entrypoint uses single public HTTP port. `bridge_service` serves both telemetry and OpenMCT static bundle.
 
 After the container starts, open:
 
 ```text
-http://127.0.0.1:5173/
+http://127.0.0.1:8080/
 ```
 
-Bridge API is exposed on:
+
 
 ```text
 http://127.0.0.1:8080/health
 http://127.0.0.1:8080/telemetry/latest
+ws://127.0.0.1:8080/realtime
 ```
 
 Stop the demo with `Ctrl+C`, or from another terminal:

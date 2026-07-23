@@ -19,6 +19,7 @@
 #include <strings.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -26,12 +27,17 @@
 #define HTTP_PORT 8080u
 #define MAX_WS_CLIENTS 8u
 #define HTTP_REQUEST_MAX 2048u
+#define HTTP_PATH_MAX 512u
+#define STATIC_FILE_PATH_MAX 1024u
 #define JSON_MAX 512u
 #define SHA1_DIGEST_LEN 20u
+#define DASHBOARD_DIST_DIR "openmct/dist"
 // Fixed WebSocket GUID from RFC 6455, used to compute Sec-WebSocket-Accept
 #define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 static volatile sig_atomic_t keep_running = 1;
+
+static const char *dashboard_html(void);
 
 typedef struct {
     bool valid;
@@ -262,6 +268,143 @@ static int send_http_response(int fd, const char *content_type, const char *body
     return send_all(fd, header, (size_t)header_len) == 0 && send_all(fd, body, strlen(body)) == 0 ? 0 : -1;
 }
 
+static int send_http_status(int fd, unsigned int status, const char *reason, const char *body)
+{
+    char header[256];
+    int header_len = snprintf(header,
+                              sizeof(header),
+                              "HTTP/1.1 %u %s\r\nContent-Type: text/plain; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: %u\r\nConnection: close\r\n\r\n",
+                              status,
+                              reason,
+                              (unsigned int)strlen(body));
+    if (header_len < 0 || (size_t)header_len >= sizeof(header)) {
+        return -1;
+    }
+    return send_all(fd, header, (size_t)header_len) == 0 && send_all(fd, body, strlen(body)) == 0 ? 0 : -1;
+}
+
+static const char *content_type_for_path(const char *path)
+{
+    const char *ext = strrchr(path, '.');
+    if (ext == NULL) {
+        return "application/octet-stream";
+    }
+    if (strcmp(ext, ".html") == 0) {
+        return "text/html; charset=utf-8";
+    }
+    if (strcmp(ext, ".js") == 0) {
+        return "text/javascript; charset=utf-8";
+    }
+    if (strcmp(ext, ".css") == 0) {
+        return "text/css; charset=utf-8";
+    }
+    if (strcmp(ext, ".json") == 0) {
+        return "application/json; charset=utf-8";
+    }
+    if (strcmp(ext, ".svg") == 0) {
+        return "image/svg+xml";
+    }
+    if (strcmp(ext, ".png") == 0) {
+        return "image/png";
+    }
+    if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) {
+        return "image/jpeg";
+    }
+    if (strcmp(ext, ".gif") == 0) {
+        return "image/gif";
+    }
+    if (strcmp(ext, ".webp") == 0) {
+        return "image/webp";
+    }
+    if (strcmp(ext, ".woff") == 0) {
+        return "font/woff";
+    }
+    if (strcmp(ext, ".woff2") == 0) {
+        return "font/woff2";
+    }
+    if (strcmp(ext, ".ttf") == 0) {
+        return "font/ttf";
+    }
+    return "application/octet-stream";
+}
+
+static bool request_path_safe(const char *path)
+{
+    return path[0] == '/' && strstr(path, "..") == NULL && strchr(path, '\\') == NULL;
+}
+
+static int send_static_file(int fd, const char *request_path)
+{
+    char path[HTTP_PATH_MAX];
+    char file_path[STATIC_FILE_PATH_MAX];
+    struct stat info;
+    FILE *file;
+    char header[256];
+    char buffer[4096];
+    size_t read_len;
+    int header_len;
+    const char *query;
+
+    if (!request_path_safe(request_path)) {
+        return send_http_status(fd, 403u, "Forbidden", "Forbidden");
+    }
+
+    query = strchr(request_path, '?');
+    if (query != NULL) {
+        size_t path_len = (size_t)(query - request_path);
+        if (path_len >= sizeof(path)) {
+            return send_http_status(fd, 414u, "URI Too Long", "URI Too Long");
+        }
+        memcpy(path, request_path, path_len);
+        path[path_len] = '\0';
+    } else {
+        if (strlen(request_path) >= sizeof(path)) {
+            return send_http_status(fd, 414u, "URI Too Long", "URI Too Long");
+        }
+        strcpy(path, request_path);
+    }
+
+    if (strcmp(path, "/") == 0) {
+        strcpy(path, "/index.html");
+    }
+
+    if (snprintf(file_path, sizeof(file_path), "%s%s", DASHBOARD_DIST_DIR, path) < 0) {
+        return -1;
+    }
+    if (stat(file_path, &info) != 0 || !S_ISREG(info.st_mode)) {
+        if (snprintf(file_path, sizeof(file_path), "%s/index.html", DASHBOARD_DIST_DIR) < 0) {
+            return -1;
+        }
+        if (stat(file_path, &info) != 0 || !S_ISREG(info.st_mode)) {
+            return send_http_response(fd, "text/html; charset=utf-8", dashboard_html());
+        }
+    }
+
+    file = fopen(file_path, "rb");
+    if (file == NULL) {
+        return send_http_status(fd, 404u, "Not Found", "Not Found");
+    }
+
+    header_len = snprintf(header,
+                          sizeof(header),
+                          "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n",
+                          content_type_for_path(file_path),
+                          (unsigned long)info.st_size);
+    if (header_len < 0 || (size_t)header_len >= sizeof(header) || send_all(fd, header, (size_t)header_len) != 0) {
+        fclose(file);
+        return -1;
+    }
+
+    while ((read_len = fread(buffer, 1u, sizeof(buffer), file)) > 0u) {
+        if (send_all(fd, buffer, read_len) != 0) {
+            fclose(file);
+            return -1;
+        }
+    }
+    fclose(file);
+    return 0;
+}
+
 static const char *dashboard_html(void)
 {
     return "<!doctype html><html><head><meta charset='utf-8'><title>AetherFlow</title>"
@@ -295,6 +438,25 @@ static int send_ws_text(int fd, const char *text)
 }
 
 // Opens small blocking HTTP listener used for health, JSON snapshot and WebSocket upgrade
+static uint16_t http_port_from_env(void)
+{
+    const char *value = getenv("PORT");
+    char *end = NULL;
+    unsigned long port;
+
+    if (value == NULL || *value == '\0') {
+        return HTTP_PORT;
+    }
+
+    errno = 0;
+    port = strtoul(value, &end, 10);
+    if (errno != 0 || end == value || *end != '\0' || port == 0u || port > 65535u) {
+        fprintf(stderr, "bridge_service: invalid PORT value '%s', using %u\n", value, (unsigned int)HTTP_PORT);
+        return HTTP_PORT;
+    }
+    return (uint16_t)port;
+}
+
 static int open_http_server(uint16_t port)
 {
     int fd;
@@ -322,6 +484,32 @@ static int open_http_server(uint16_t port)
         return -1;
     }
     return fd;
+}
+
+static bool request_target(const char *request, char *out, size_t out_capacity)
+{
+    const char *path_start;
+    const char *path_end;
+    size_t path_len;
+
+    if (strncmp(request, "GET ", 4u) != 0) {
+        return false;
+    }
+
+    path_start = request + 4;
+    path_end = strchr(path_start, ' ');
+    if (path_end == NULL) {
+        return false;
+    }
+
+    path_len = (size_t)(path_end - path_start);
+    if (path_len == 0u || path_len >= out_capacity) {
+        return false;
+    }
+
+    memcpy(out, path_start, path_len);
+    out[path_len] = '\0';
+    return true;
 }
 
 static const char *find_header_value(const char *request, const char *header_name, char *out, size_t out_capacity)
@@ -436,6 +624,7 @@ static void handle_http_client(int server_fd,
 {
     int client_fd = accept(server_fd, NULL, NULL);
     char request[HTTP_REQUEST_MAX];
+    char path[HTTP_PATH_MAX];
     ssize_t received;
 
     if (client_fd < 0) {
@@ -448,8 +637,13 @@ static void handle_http_client(int server_fd,
         return;
     }
     request[received] = '\0';
+    if (!request_target(request, path, sizeof(path))) {
+        (void)send_http_status(client_fd, 405u, "Method Not Allowed", "Method Not Allowed");
+        close(client_fd);
+        return;
+    }
 
-    if (strncmp(request, "GET /realtime ", 14u) == 0) {
+    if (strcmp(path, "/realtime") == 0) {
         char key[160];
         char accept_key[64];
         char response[256];
@@ -482,16 +676,16 @@ static void handle_http_client(int server_fd,
         return;
     }
 
-    if (strncmp(request, "GET /telemetry/latest ", 22u) == 0) {
+    if (strcmp(path, "/telemetry/latest") == 0) {
         if (telemetry->valid) {
             (void)send_http_response(client_fd, "application/json", telemetry->json);
         } else {
             (void)send_http_response(client_fd, "application/json", "{\"valid\":false}");
         }
-    } else if (strncmp(request, "GET /health ", 12u) == 0) {
+    } else if (strcmp(path, "/health") == 0) {
         (void)send_http_response(client_fd, "application/json", "{\"status\":\"ok\"}");
     } else {
-        (void)send_http_response(client_fd, "text/html; charset=utf-8", dashboard_html());
+        (void)send_static_file(client_fd, path);
     }
     close(client_fd);
 }
@@ -534,6 +728,7 @@ static void handle_can_frame(const can_frame_t *frame,
 int main(void)
 {
     udp_transport_t transport;
+    uint16_t http_port = http_port_from_env();
     int server_fd;
     int ws_clients[MAX_WS_CLIENTS];
     spacecan_reassembly_t reassembly;
@@ -558,17 +753,17 @@ int main(void)
         return 1;
     }
 
-    server_fd = open_http_server(HTTP_PORT);
+    server_fd = open_http_server(http_port);
     if (server_fd < 0) {
-        fprintf(stderr, "bridge_service: failed to open HTTP/WebSocket server on port %u\n", (unsigned int)HTTP_PORT);
+        fprintf(stderr, "bridge_service: failed to open HTTP/WebSocket server on port %u\n", (unsigned int)http_port);
         udp_transport_close(&transport);
         return 1;
     }
 
-    printf("bridge_service: UDP multicast bus %s:%u HTTP/WebSocket http://127.0.0.1:%u/\n",
+    printf("bridge_service: UDP multicast bus %s:%u HTTP/WebSocket http://0.0.0.0:%u/\n",
            AETHERFLOW_UDP_GROUP,
            (unsigned int)AETHERFLOW_UDP_PORT,
-           (unsigned int)HTTP_PORT);
+           (unsigned int)http_port);
 
     while (keep_running) {
         fd_set read_fds;
