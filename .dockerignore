@@ -7,7 +7,6 @@ logs
 
 controller_simulator
 eps_simulator
-bridge_service
 tools/generate_spacecan_vectors
 tests/test_spacecan_codec
 tests/test_eps_simulator

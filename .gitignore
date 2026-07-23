@@ -1,5 +1,4 @@
 # C build outputs
-/bridge_service
 /controller_simulator
 /eps_simulator
 /tests/test_spacecan_codec
