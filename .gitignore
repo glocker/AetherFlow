@@ -1,11 +1,13 @@
 # C build outputs
 /controller_simulator
 /eps_simulator
+/bridge_service_c
 /tests/test_spacecan_codec
 /tests/test_eps_simulator
 /tools/generate_spacecan_vectors
 
 # Runtime artifacts
+.env
 /logs/
 *.log
 *.pid

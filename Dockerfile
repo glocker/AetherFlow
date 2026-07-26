@@ -26,9 +26,7 @@ RUN make clean \
 
 FROM debian:bookworm-slim AS runtime
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PORT=8080 \
-    AETHERFLOW_LOG_DIR=/app/logs
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

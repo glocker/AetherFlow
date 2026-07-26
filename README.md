@@ -190,20 +190,18 @@ Run full local demo:
 make demo
 ```
 
-This builds all needed backend services (bridge, EPS simulator, controller simulator), installs OpenMCT dashboard dependencies and runs dashboard dev server, then prints dashboard URL:
+This builds all needed backend services (bridge, EPS simulator, controller simulator), builds OpenMCT dashboard bundle and serves complete demo from bridge service:
 
 ```text
-http://127.0.0.1:5173/
+http://127.0.0.1:8080/
 ```
 
 Logs are written to `logs/`. Press `Ctrl+C` in the `make demo` terminal to stop all demo processes.
 
-Useful environment overrides:
+Default local settings are stored in `aetherflow.env` (no secrets). For temporary local overrides, pass variables inline:
 
 ```sh
 AETHERFLOW_CONTROLLER_RATE_HZ=10 make demo
-AETHERFLOW_BRIDGE_URL=http://127.0.0.1:8080 make demo
-AETHERFLOW_DASHBOARD_URL=http://127.0.0.1:5173 make demo
 ```
 
 Build everything and run tests:
@@ -218,11 +216,13 @@ Build only backend service binaries:
 make backend
 ```
 
-Run OpenMCT based dashboard separately:
+Run OpenMCT dashboard dev server separately for frontend only:
 
 ```sh
 make dashboard-dev
 ```
+
+The dev server has its own default port in `openmct/scripts/serve.js`; full demo does not need that port.
 
 Build or preview dashboard production bundle:
 
@@ -231,7 +231,7 @@ make dashboard-build
 make dashboard-preview
 ```
 
-The dashboard connects to `http://127.0.0.1:8080` by default. To point it at another bridge endpoint, pass `?bridge=http://host:port` in the dashboard URL.
+The dashboard connects to the same bridge origin by default. To point it at another bridge endpoint, pass `?bridge=http://host:port` in the dashboard URL.
 
 ### Docker demo
 
@@ -280,7 +280,8 @@ Use this when you want each service in its own terminal:
 
 ```sh
 make backend
-./bridge_service
+make dashboard-build
+./bridge_service_c
 ./eps_simulator
 ./controller_simulator 5
 ```

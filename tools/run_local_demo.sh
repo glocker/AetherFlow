@@ -2,8 +2,10 @@
 
 set -u
 
-BRIDGE_URL=${AETHERFLOW_BRIDGE_URL:-http://127.0.0.1:8080}
-DASHBOARD_URL=${AETHERFLOW_DASHBOARD_URL:-http://127.0.0.1:5173}
+. ./aetherflow.env
+
+HTTP_PORT=$AETHERFLOW_HTTP_PORT
+BRIDGE_URL=${AETHERFLOW_BRIDGE_URL:-http://127.0.0.1:$HTTP_PORT}
 CONTROLLER_RATE_HZ=${AETHERFLOW_CONTROLLER_RATE_HZ:-5}
 LOG_DIR=${AETHERFLOW_LOG_DIR:-logs}
 PID_FILE="$LOG_DIR/demo.pids"
@@ -11,7 +13,6 @@ PID_FILE="$LOG_DIR/demo.pids"
 BRIDGE_PID=""
 EPS_PID=""
 CONTROLLER_PID=""
-DASHBOARD_PID=""
 CLEANED_UP=0
 
 mkdir -p "$LOG_DIR"
@@ -46,7 +47,7 @@ cleanup() {
     info ""
     info "Stopping AetherFlow demo..."
 
-    for pid in "$DASHBOARD_PID" "$CONTROLLER_PID" "$EPS_PID" "$BRIDGE_PID"; do
+    for pid in "$CONTROLLER_PID" "$EPS_PID" "$BRIDGE_PID"; do
         if pid_alive "$pid"; then
             kill "$pid" 2>/dev/null || true
         fi
@@ -54,7 +55,7 @@ cleanup() {
 
     sleep 1
 
-    for pid in "$DASHBOARD_PID" "$CONTROLLER_PID" "$EPS_PID" "$BRIDGE_PID"; do
+    for pid in "$CONTROLLER_PID" "$EPS_PID" "$BRIDGE_PID"; do
         if pid_alive "$pid"; then
             kill -9 "$pid" 2>/dev/null || true
         fi
@@ -68,22 +69,22 @@ trap 'cleanup; exit 0' INT TERM
 trap cleanup EXIT
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
-command -v npm >/dev/null 2>&1 || fail "npm is required"
 
-[ -x ./bridge_service ] || fail "./bridge_service is missing; run make backend"
+[ -x ./bridge_service_c ] || fail "./bridge_service_c is missing; run make backend"
 [ -x ./eps_simulator ] || fail "./eps_simulator is missing; run make backend"
 [ -x ./controller_simulator ] || fail "./controller_simulator is missing; run make backend"
-[ -f openmct/package.json ] || fail "openmct/package.json is missing"
+[ -f openmct/dist/index.html ] || fail "openmct/dist/index.html is missing; run make dashboard-build"
 
 info "AetherFlow demo starting..."
 info "Logs: $LOG_DIR/"
 info "PID file: $PID_FILE"
+info "HTTP port: $HTTP_PORT"
 info ""
 
-./bridge_service > "$LOG_DIR/bridge_service.log" 2>&1 &
+AETHERFLOW_HTTP_PORT="$HTTP_PORT" ./bridge_service_c > "$LOG_DIR/bridge_service.log" 2>&1 &
 BRIDGE_PID=$!
 write_pid bridge_service "$BRIDGE_PID"
-info "[1/4] bridge_service       pid=$BRIDGE_PID $BRIDGE_URL"
+info "[1/3] bridge_service       pid=$BRIDGE_PID $BRIDGE_URL"
 
 health_ok=0
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -104,18 +105,12 @@ done
 ./eps_simulator > "$LOG_DIR/eps_simulator.log" 2>&1 &
 EPS_PID=$!
 write_pid eps_simulator "$EPS_PID"
-info "[2/4] eps_simulator        pid=$EPS_PID UDP virtual CAN bus"
+info "[2/3] eps_simulator        pid=$EPS_PID UDP virtual CAN bus"
 
 ./controller_simulator "$CONTROLLER_RATE_HZ" > "$LOG_DIR/controller_simulator.log" 2>&1 &
 CONTROLLER_PID=$!
 write_pid controller_simulator "$CONTROLLER_PID"
-info "[3/4] controller_simulator pid=$CONTROLLER_PID rate=${CONTROLLER_RATE_HZ}Hz"
-
-npm --prefix openmct run dev > "$LOG_DIR/openmct.log" 2>&1 &
-DASHBOARD_PID=$!
-write_pid openmct_dashboard "$DASHBOARD_PID"
-info "[4/4] openmct dashboard    pid=$DASHBOARD_PID $DASHBOARD_URL"
-info ""
+info "[3/3] controller_simulator pid=$CONTROLLER_PID rate=${CONTROLLER_RATE_HZ}Hz"
 
 telemetry_ok=0
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -147,7 +142,7 @@ fi
 
 info ""
 info "Open dashboard:"
-info "$DASHBOARD_URL"
+info "$BRIDGE_URL/"
 info ""
 info "Bridge API:"
 info "$BRIDGE_URL/health"
@@ -164,9 +159,6 @@ while :; do
     fi
     if ! pid_alive "$CONTROLLER_PID"; then
         fail "controller_simulator stopped; see $LOG_DIR/controller_simulator.log"
-    fi
-    if ! pid_alive "$DASHBOARD_PID"; then
-        fail "OpenMCT dashboard stopped; see $LOG_DIR/openmct.log"
     fi
     sleep 2
 done

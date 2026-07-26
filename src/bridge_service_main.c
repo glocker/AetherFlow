@@ -440,7 +440,7 @@ static int send_ws_text(int fd, const char *text)
 // Opens small blocking HTTP listener used for health, JSON snapshot and WebSocket upgrade
 static uint16_t http_port_from_env(void)
 {
-    const char *value = getenv("PORT");
+    const char *value = getenv("AETHERFLOW_HTTP_PORT");
     char *end = NULL;
     unsigned long port;
 
@@ -451,7 +451,7 @@ static uint16_t http_port_from_env(void)
     errno = 0;
     port = strtoul(value, &end, 10);
     if (errno != 0 || end == value || *end != '\0' || port == 0u || port > 65535u) {
-        fprintf(stderr, "bridge_service: invalid PORT value '%s', using %u\n", value, (unsigned int)HTTP_PORT);
+        fprintf(stderr, "bridge_service: invalid HTTP port value '%s', using %u\n", value, (unsigned int)HTTP_PORT);
         return HTTP_PORT;
     }
     return (uint16_t)port;

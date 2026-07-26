@@ -2,8 +2,10 @@
 
 set -u
 
-PORT=${PORT:-8080}
-BRIDGE_URL=${AETHERFLOW_BRIDGE_URL:-http://127.0.0.1:$PORT}
+. ./aetherflow.env
+
+HTTP_PORT=$AETHERFLOW_HTTP_PORT
+BRIDGE_URL=${AETHERFLOW_BRIDGE_URL:-http://127.0.0.1:$HTTP_PORT}
 CONTROLLER_RATE_HZ=${AETHERFLOW_CONTROLLER_RATE_HZ:-5}
 LOG_DIR=${AETHERFLOW_LOG_DIR:-logs}
 PID_FILE="$LOG_DIR/hosted-demo.pids"
@@ -68,7 +70,7 @@ trap cleanup EXIT
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 
-[ -x ./bridge_service ] || fail "./bridge_service is missing; run make backend"
+[ -x ./bridge_service_c ] || fail "./bridge_service_c is missing; run make backend"
 [ -x ./eps_simulator ] || fail "./eps_simulator is missing; run make backend"
 [ -x ./controller_simulator ] || fail "./controller_simulator is missing; run make backend"
 [ -f openmct/dist/index.html ] || fail "openmct/dist/index.html is missing; run make dashboard-build"
@@ -76,10 +78,10 @@ command -v curl >/dev/null 2>&1 || fail "curl is required"
 info "AetherFlow hosted demo starting..."
 info "Logs: $LOG_DIR/"
 info "PID file: $PID_FILE"
-info "HTTP port: $PORT"
+info "HTTP port: $HTTP_PORT"
 info ""
 
-PORT="$PORT" ./bridge_service > "$LOG_DIR/bridge_service.log" 2>&1 &
+AETHERFLOW_HTTP_PORT="$HTTP_PORT" ./bridge_service_c > "$LOG_DIR/bridge_service.log" 2>&1 &
 BRIDGE_PID=$!
 write_pid bridge_service "$BRIDGE_PID"
 info "[1/3] bridge_service       pid=$BRIDGE_PID $BRIDGE_URL"

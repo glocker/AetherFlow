@@ -6,9 +6,8 @@ services:
     image: aetherflow:local
     ports:
       - "8080:8080"
-    environment:
-      PORT: 8080
-      AETHERFLOW_CONTROLLER_RATE_HZ: 5
+    env_file:
+      - aetherflow.env
     volumes:
       - aetherflow-logs:/app/logs
 

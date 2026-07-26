@@ -1,5 +1,14 @@
+include aetherflow.env
+export
+
 CC ?= cc
 CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude
+
+AETHERFLOW_HTTP_PORT ?= 8080
+AETHERFLOW_UDP_GROUP ?= 224.0.0.1
+AETHERFLOW_UDP_PORT ?= 40700
+AETHERFLOW_CONTROLLER_RATE_HZ ?= 5
+AETHERFLOW_LOG_DIR ?= logs
 
 SPACECAN_SRCS := \
 	src/spacecan_id.c \
@@ -23,7 +32,7 @@ VECTOR_FILE := compat/vectors/aetherflow_spacecan_vectors.json
 
 CONTROLLER_SIMULATOR_BIN := controller_simulator
 EPS_SIMULATOR_BIN := eps_simulator
-BRIDGE_SERVICE_BIN := bridge_service
+BRIDGE_SERVICE_BIN := bridge_service_c
 BACKEND_BINS := $(CONTROLLER_SIMULATOR_BIN) $(EPS_SIMULATOR_BIN) $(BRIDGE_SERVICE_BIN)
 
 .PHONY: all build backend dashboard-install dashboard-dev dashboard-build dashboard-preview demo test clean vectors compat compat-python
@@ -46,7 +55,7 @@ dashboard-build:
 dashboard-preview:
 	npm --prefix openmct run preview
 
-demo: backend dashboard-install
+demo: backend dashboard-install dashboard-build
 	./tools/run_local_demo.sh
 
 tests/test_spacecan_codec: tests/test_spacecan_codec.c $(SPACECAN_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h
