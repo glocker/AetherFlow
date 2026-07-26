@@ -6,8 +6,10 @@
 /tests/test_eps_simulator
 /tools/generate_spacecan_vectors
 
+# Python
+/bridge_service/__pycache__
+
 # Runtime artifacts
-.env
 /logs/
 *.log
 *.pid
