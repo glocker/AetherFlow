@@ -5,14 +5,13 @@ set -u
 . ./aetherflow.env
 
 HTTP_PORT=$AETHERFLOW_HTTP_PORT
+CAN_INTERFACE=${AETHERFLOW_CAN_INTERFACE:-vcan0}
 BRIDGE_URL=${AETHERFLOW_BRIDGE_URL:-http://127.0.0.1:$HTTP_PORT}
-CONTROLLER_RATE_HZ=${AETHERFLOW_CONTROLLER_RATE_HZ:-5}
 LOG_DIR=${AETHERFLOW_LOG_DIR:-logs}
 PID_FILE="$LOG_DIR/demo.pids"
 
 BRIDGE_PID=""
 EPS_PID=""
-CONTROLLER_PID=""
 CLEANED_UP=0
 
 mkdir -p "$LOG_DIR"
@@ -47,7 +46,7 @@ cleanup() {
     info ""
     info "Stopping AetherFlow demo..."
 
-    for pid in "$CONTROLLER_PID" "$EPS_PID" "$BRIDGE_PID"; do
+    for pid in "$EPS_PID" "$BRIDGE_PID"; do
         if pid_alive "$pid"; then
             kill "$pid" 2>/dev/null || true
         fi
@@ -55,7 +54,7 @@ cleanup() {
 
     sleep 1
 
-    for pid in "$CONTROLLER_PID" "$EPS_PID" "$BRIDGE_PID"; do
+    for pid in "$EPS_PID" "$BRIDGE_PID"; do
         if pid_alive "$pid"; then
             kill -9 "$pid" 2>/dev/null || true
         fi
@@ -69,22 +68,26 @@ trap 'cleanup; exit 0' INT TERM
 trap cleanup EXIT
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
+command -v ip >/dev/null 2>&1 || fail "iproute2 is required"
+python3 -c 'import socket; raise SystemExit(0 if hasattr(socket, "PF_CAN") else 1)' >/dev/null 2>&1 || fail "Python SocketCAN support is required"
 
-[ -x ./bridge_service_c ] || fail "./bridge_service_c is missing; run make backend"
-[ -x ./eps_simulator ] || fail "./eps_simulator is missing; run make backend"
-[ -x ./controller_simulator ] || fail "./controller_simulator is missing; run make backend"
+if ! ip link show "$CAN_INTERFACE" >/dev/null 2>&1; then
+    fail "$CAN_INTERFACE is missing. Create it with: sudo modprobe vcan && sudo ip link add dev $CAN_INTERFACE type vcan && sudo ip link set up $CAN_INTERFACE"
+fi
+
 [ -f openmct/dist/index.html ] || fail "openmct/dist/index.html is missing; run make dashboard-build"
 
-info "AetherFlow demo starting..."
+info "AetherFlow SocketCAN demo starting..."
 info "Logs: $LOG_DIR/"
 info "PID file: $PID_FILE"
+info "CAN interface: $CAN_INTERFACE"
 info "HTTP port: $HTTP_PORT"
 info ""
 
-AETHERFLOW_HTTP_PORT="$HTTP_PORT" ./bridge_service_c > "$LOG_DIR/bridge_service.log" 2>&1 &
+AETHERFLOW_HTTP_PORT="$HTTP_PORT" AETHERFLOW_CAN_INTERFACE="$CAN_INTERFACE" python3 -m bridge_service > "$LOG_DIR/bridge_service.log" 2>&1 &
 BRIDGE_PID=$!
 write_pid bridge_service "$BRIDGE_PID"
-info "[1/3] bridge_service       pid=$BRIDGE_PID $BRIDGE_URL"
+info "[1/2] bridge_service  pid=$BRIDGE_PID $BRIDGE_URL"
 
 health_ok=0
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -102,15 +105,10 @@ done
 
 [ "$health_ok" -eq 1 ] || fail "bridge health check failed at $BRIDGE_URL/health; see $LOG_DIR/bridge_service.log"
 
-./eps_simulator > "$LOG_DIR/eps_simulator.log" 2>&1 &
+AETHERFLOW_CAN_INTERFACE="$CAN_INTERFACE" python3 -m eps_emulator > "$LOG_DIR/eps_emulator.log" 2>&1 &
 EPS_PID=$!
-write_pid eps_simulator "$EPS_PID"
-info "[2/3] eps_simulator        pid=$EPS_PID UDP virtual CAN bus"
-
-./controller_simulator "$CONTROLLER_RATE_HZ" > "$LOG_DIR/controller_simulator.log" 2>&1 &
-CONTROLLER_PID=$!
-write_pid controller_simulator "$CONTROLLER_PID"
-info "[3/3] controller_simulator pid=$CONTROLLER_PID rate=${CONTROLLER_RATE_HZ}Hz"
+write_pid eps_emulator "$EPS_PID"
+info "[2/2] eps_emulator   pid=$EPS_PID SocketCAN $CAN_INTERFACE"
 
 telemetry_ok=0
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -124,10 +122,7 @@ for attempt in 1 2 3 4 5 6 7 8 9 10; do
     esac
 
     if ! pid_alive "$EPS_PID"; then
-        fail "eps_simulator exited early; see $LOG_DIR/eps_simulator.log"
-    fi
-    if ! pid_alive "$CONTROLLER_PID"; then
-        fail "controller_simulator exited early; see $LOG_DIR/controller_simulator.log"
+        fail "eps_emulator exited early; see $LOG_DIR/eps_emulator.log"
     fi
 
     sleep 1
@@ -144,21 +139,18 @@ info ""
 info "Open dashboard:"
 info "$BRIDGE_URL/"
 info ""
-info "Bridge API:"
-info "$BRIDGE_URL/health"
-info "$BRIDGE_URL/telemetry/latest"
+info "Fault command socket examples:"
+info "printf '%s\n' '{\"fault\":\"panel_short\",\"enabled\":true}' | nc 127.0.0.1 40710"
+info "printf '%s\n' '{\"fault\":\"clear\"}' | nc 127.0.0.1 40710"
 info ""
-info "Press Ctrl+C to stop all demo processes."
+info "Press Ctrl+C to stop demo processes."
 
 while :; do
     if ! pid_alive "$BRIDGE_PID"; then
         fail "bridge_service stopped; see $LOG_DIR/bridge_service.log"
     fi
     if ! pid_alive "$EPS_PID"; then
-        fail "eps_simulator stopped; see $LOG_DIR/eps_simulator.log"
-    fi
-    if ! pid_alive "$CONTROLLER_PID"; then
-        fail "controller_simulator stopped; see $LOG_DIR/controller_simulator.log"
+        fail "eps_emulator stopped; see $LOG_DIR/eps_emulator.log"
     fi
     sleep 2
 done

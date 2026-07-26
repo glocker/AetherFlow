@@ -1,4 +1,4 @@
-#HTTP/WebSocket bridge service orchestration
+# HTTP/WebSocket bridge service orchestration
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 from socket import socket as Socket
 
 from .can_wire import CanFrame
-from .config import HTTP_PORT, UDP_GROUP, UDP_PORT
+from .config import CAN_INTERFACE, EPS_NODE_ID, HTTP_PORT
 from .spacecan import (
     SpaceCanFrameClass,
     SpaceCanReassembly,
@@ -21,7 +21,7 @@ from .spacecan import (
     reassembly_accept,
 )
 from .telemetry import TelemetrySnapshot, decode_eps_housekeeping
-from .udp_bus import TRANSPORT_OK, open_transport, transport_recv
+from .transports import eps_reply_filter, open_socketcan_transport
 from .websocket import send_all, send_ws_text, websocket_accept_key
 
 MAX_WS_CLIENTS = 8
@@ -241,7 +241,7 @@ def handle_http_client(server: Socket, ws_clients: list[Socket], telemetry: Tele
 
 def handle_can_frame(
     frame: CanFrame,
-    reassembly: SpaceCanReassembly,
+    reassemblies: dict[tuple[int, int], SpaceCanReassembly],
     telemetry: TelemetrySnapshot,
     ws_clients: list[Socket],
 ) -> None:
@@ -251,6 +251,9 @@ def handle_can_frame(
         return
     if parsed_id.frame_class != SpaceCanFrameClass.REPLY:
         return
+
+    reassembly_key = (int(parsed_id.frame_class), parsed_id.node_id)
+    reassembly = reassemblies.setdefault(reassembly_key, SpaceCanReassembly())
 
     try:
         status, packet = reassembly_accept(reassembly, frame)
@@ -284,14 +287,14 @@ def main() -> int:
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
     telemetry = TelemetrySnapshot()
-    reassembly = SpaceCanReassembly()
+    reassemblies: dict[tuple[int, int], SpaceCanReassembly] = {}
     ws_clients: list[Socket] = []
     http_port = HTTP_PORT
 
     try:
-        transport = open_transport(UDP_GROUP, UDP_PORT)
-    except OSError:
-        print(f"bridge_service: failed to open UDP multicast bus {UDP_GROUP}:{UDP_PORT}", file=sys.stderr)
+        transport = open_socketcan_transport(CAN_INTERFACE, [eps_reply_filter(EPS_NODE_ID)])
+    except OSError as error:
+        print(f"bridge_service: failed to open SocketCAN interface {CAN_INTERFACE}: {error}", file=sys.stderr)
         return 1
 
     try:
@@ -301,16 +304,16 @@ def main() -> int:
         transport.close()
         return 1
 
-    print(f"bridge_service: UDP multicast bus {UDP_GROUP}:{UDP_PORT} HTTP/WebSocket http://0.0.0.0:{http_port}/")
+    print(f"bridge_service: SocketCAN {CAN_INTERFACE} HTTP/WebSocket http://0.0.0.0:{http_port}/")
     try:
         while _keep_running:
-            ready, _, _ = select.select([transport.rx, server], [], [], 0.5)
+            ready, _, _ = select.select([transport.fd, server], [], [], 0.5)
             if server in ready:
                 handle_http_client(server, ws_clients, telemetry)
-            if transport.rx in ready:
-                status, frame = transport_recv(transport, 0)
-                if status == TRANSPORT_OK and frame is not None:
-                    handle_can_frame(frame, reassembly, telemetry, ws_clients)
+            if transport.fd in ready:
+                frame = transport.recv()
+                if frame is not None:
+                    handle_can_frame(frame, reassemblies, telemetry, ws_clients)
     finally:
         for client in ws_clients:
             try:

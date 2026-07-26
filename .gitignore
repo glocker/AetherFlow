@@ -1,13 +1,11 @@
-# C build outputs
-/controller_simulator
-/eps_simulator
-/bridge_service_c
+# C test/vector build outputs
 /tests/test_spacecan_codec
 /tests/test_eps_simulator
 /tools/generate_spacecan_vectors
 
 # Python
-/bridge_service/__pycache__
+__pycache__/
+*.py[cod]
 
 # Runtime artifacts
 /logs/

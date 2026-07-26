@@ -3,11 +3,10 @@ export
 
 CC ?= cc
 CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude
+PYTHON ?= python3
 
 AETHERFLOW_HTTP_PORT ?= 8080
-AETHERFLOW_UDP_GROUP ?= 224.0.0.1
-AETHERFLOW_UDP_PORT ?= 40700
-AETHERFLOW_CONTROLLER_RATE_HZ ?= 5
+AETHERFLOW_CAN_INTERFACE ?= vcan0
 AETHERFLOW_LOG_DIR ?= logs
 
 SPACECAN_SRCS := \
@@ -19,10 +18,6 @@ SPACECAN_SRCS := \
 EPS_SRCS := \
 	src/eps_simulator.c
 
-TRANSPORT_SRCS := \
-	src/can_frame_wire.c \
-	transport/udp_transport.c
-
 TEST_BINS := \
 	tests/test_spacecan_codec \
 	tests/test_eps_simulator
@@ -30,18 +25,15 @@ TEST_BINS := \
 VECTOR_GENERATOR_BIN := tools/generate_spacecan_vectors
 VECTOR_FILE := compat/vectors/aetherflow_spacecan_vectors.json
 
-CONTROLLER_SIMULATOR_BIN := controller_simulator
-EPS_SIMULATOR_BIN := eps_simulator
-BRIDGE_SERVICE_BIN := bridge_service_c
-BACKEND_BINS := $(CONTROLLER_SIMULATOR_BIN) $(EPS_SIMULATOR_BIN) $(BRIDGE_SERVICE_BIN)
+PYTHON_SRCS := \
+	bridge_service/*.py \
+	bridge_service/eps/*.py \
+	bridge_service/transports/*.py \
+	eps_emulator/*.py
 
-.PHONY: all build backend dashboard-install dashboard-dev dashboard-build dashboard-preview demo test clean vectors compat compat-python
+.PHONY: all dashboard-install dashboard-dev dashboard-build dashboard-preview demo test c-test python-check clean vectors compat compat-python FORCE
 
-all: test backend compat
-
-build: backend
-
-backend: $(BACKEND_BINS)
+all: test compat
 
 dashboard-install:
 	npm ci --prefix openmct
@@ -55,13 +47,13 @@ dashboard-build:
 dashboard-preview:
 	npm --prefix openmct run preview
 
-demo: backend dashboard-install dashboard-build
+demo: dashboard-build
 	./tools/run_local_demo.sh
 
-tests/test_spacecan_codec: tests/test_spacecan_codec.c $(SPACECAN_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h
+tests/test_spacecan_codec: FORCE tests/test_spacecan_codec.c $(SPACECAN_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h
 	$(CC) $(CFLAGS) tests/test_spacecan_codec.c $(SPACECAN_SRCS) -o $@
 
-tests/test_eps_simulator: tests/test_eps_simulator.c $(SPACECAN_SRCS) $(EPS_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h
+tests/test_eps_simulator: FORCE tests/test_eps_simulator.c $(SPACECAN_SRCS) $(EPS_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h
 	$(CC) $(CFLAGS) tests/test_eps_simulator.c $(SPACECAN_SRCS) $(EPS_SRCS) -o $@
 
 $(VECTOR_GENERATOR_BIN): tools/generate_spacecan_vectors.c $(SPACECAN_SRCS) $(EPS_SRCS) include/can_frame.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h
@@ -73,22 +65,18 @@ $(VECTOR_FILE): $(VECTOR_GENERATOR_BIN)
 vectors: $(VECTOR_FILE)
 
 compat-python: $(VECTOR_FILE)
-	python3 compat/python/check_vectors.py $(VECTOR_FILE)
+	$(PYTHON) compat/python/check_vectors.py $(VECTOR_FILE)
 
 compat: compat-python
 
-$(CONTROLLER_SIMULATOR_BIN): src/controller_simulator_main.c $(SPACECAN_SRCS) $(TRANSPORT_SRCS) include/can_frame.h include/can_frame_wire.h include/spacecan.h include/transport.h
-	$(CC) $(CFLAGS) src/controller_simulator_main.c $(SPACECAN_SRCS) $(TRANSPORT_SRCS) -o $@
-
-$(EPS_SIMULATOR_BIN): src/eps_simulator_main.c $(SPACECAN_SRCS) $(EPS_SRCS) $(TRANSPORT_SRCS) include/can_frame.h include/can_frame_wire.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h include/transport.h
-	$(CC) $(CFLAGS) src/eps_simulator_main.c $(SPACECAN_SRCS) $(EPS_SRCS) $(TRANSPORT_SRCS) -o $@
-
-$(BRIDGE_SERVICE_BIN): src/bridge_service_main.c $(SPACECAN_SRCS) $(EPS_SRCS) $(TRANSPORT_SRCS) include/can_frame.h include/can_frame_wire.h include/spacecan.h include/spacecan_services.h include/eps_simulator.h include/transport.h
-	$(CC) $(CFLAGS) src/bridge_service_main.c $(SPACECAN_SRCS) $(EPS_SRCS) $(TRANSPORT_SRCS) -o $@
-
-test: $(TEST_BINS)
+c-test: $(TEST_BINS)
 	./tests/test_spacecan_codec
 	./tests/test_eps_simulator
 
+python-check:
+	$(PYTHON) -m py_compile $(PYTHON_SRCS)
+
+test: c-test python-check
+
 clean:
-	rm -f $(TEST_BINS) $(BACKEND_BINS) $(VECTOR_GENERATOR_BIN)
+	rm -f $(TEST_BINS) $(VECTOR_GENERATOR_BIN)

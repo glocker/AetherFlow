@@ -1,27 +1,12 @@
 name: CI
 
-# Temporarily disabled for auto pushes/PRs.
-#
-# Remove next comments to enable:
-#
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#   workflow_dispatch:
-
 on:
   workflow_dispatch:
 
 jobs:
   build-test:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -39,11 +24,8 @@ jobs:
           node --version
           npm --version
 
-      - name: C tests
+      - name: Backend and protocol tests
         run: make test
-
-      - name: Backend build
-        run: make backend
 
       - name: Compatibility vectors
         run: make compat

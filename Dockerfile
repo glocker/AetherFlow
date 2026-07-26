@@ -20,7 +20,6 @@ RUN npm ci --prefix openmct
 COPY . .
 RUN make clean \
     && make test \
-    && make backend \
     && make compat \
     && make dashboard-build
 
@@ -32,6 +31,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        iproute2 \
+        python3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -40,4 +41,4 @@ COPY --from=build /app /app
 
 EXPOSE 8080
 
-CMD ["./tools/run_hosted_demo.sh"]
+CMD ["python3", "-m", "bridge_service"]
