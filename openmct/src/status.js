@@ -37,11 +37,16 @@ export function validatePacket(packet) {
     'service',
     'subtype',
     'sequence',
+    'power_mode_id',
     'bus_voltage_mv',
     'bus_current_ma',
     'battery_percent',
+    'battery_voltage_mv',
+    'battery_current_ma',
+    'solar_current_ma',
     'temperature_cdeg',
     'status_flags',
+    'fault_flags',
     'timestamp_ms'
   ];
 
@@ -53,6 +58,10 @@ export function validatePacket(packet) {
 
   if (typeof packet.state !== 'string' || packet.state.length === 0) {
     return { valid: false, reason: 'missing or invalid state field' };
+  }
+
+  if (typeof packet.power_mode !== 'string' || packet.power_mode.length === 0) {
+    return { valid: false, reason: 'missing or invalid power_mode field' };
   }
 
   if (packet.battery_percent < 0 || packet.battery_percent > 100) {

@@ -1,75 +1,45 @@
 # AetherFlow
 
-AetherFlow is end-to-end CubeSat telemetry demo written around a transport independent SpaceCAN codec in C.
+AetherFlow is an end-to-end CubeSat EPS telemetry demo for Linux/SocketCAN.
 
-Goal: show how embedded-style telemetry can move through a protocol stack into a ground-segment dashboard:
+Goal: show how embedded-style EPS telemetry can move through a CAN/SpaceCAN protocol stack into an Open MCT-style ground dashboard.
+
 ![Project scheme](https://github.com/glocker/AetherFlow/blob/3d5ac8aa0df2bd974a6bb89b74e3de859b6f5f61/Scheme.png)
 
-Current demo runs as separate local macOS processes. UDP multicast acts as a virtual CAN bus for development. Later transports can replace it with SocketCAN, STM32 HAL, Zephyr CAN or FreeRTOS vendor CAN while keeping the SpaceCAN codec and simulator logic unchanged.
+## Current runtime
 
-## How it works
-
-### `controller_simulator`
-
-`controller_simulator` is a simple bus time source. It periodically publishes SpaceCAN/CAN `SYNC` frames:
+The active runtime is Linux-only and uses SocketCAN with `vcan0` for local development:
 
 ```text
-CAN ID: 0x080
-DLC: 0
+Python EPS emulator -> SocketCAN vcan0 -> Python bridge_service -> HTTP/WebSocket -> Open MCT dashboard
 ```
 
-EPS nodes react to these ticks. This mirrors a minimal spacecraft bus heartbeat without adding command handling yet.
+The remaining C code is kept only for SpaceCAN codec/EPS compatibility tests and vector generation.
 
-### `eps_simulator`
+## Components
 
-`eps_simulator` represents an EPS node with node id `1`.
+### `eps_emulator`
 
-It listens to the virtual CAN bus and feeds incoming frames into the existing EPS state machine:
+`eps_emulator` is a Python EPS node simulator with SpaceCAN node id `1` by default.
 
-```text
-BOOT -> PRE_OPERATIONAL -> OPERATIONAL
-```
+It sends telemetry periodically without requiring a separate controller/SYNC process:
 
-After it reaches `OPERATIONAL`, every next `SYNC` produces deterministic housekeeping telemetry. That telemetry is packed as SpaceCAN service 3 subtype 25 and fragmented into CAN frames:
+- critical EPS telemetry every `200 ms` by default;
+- housekeeping telemetry every `1 s` by default;
+- both are sent as SpaceCAN housekeeping packets fragmented into standard 8-byte CAN frames.
 
-```text
-CAN ID: 0x581
-service: 3
-subtype: 25
-payload: EPS housekeeping bytes
-```
+The simulator contains a small dynamic power model:
 
-Synthetic mode still exists for quick codec/state-machine checks without transport.
-
-### UDP multicast virtual CAN bus
-
-Transport layer connects local processes through UDP multicast:
-
-```text
-multicast group: 224.0.0.1
-UDP port: 40700
-```
-
-Each UDP datagram contains one CAN frame encoded with `AFC1` wire envelope. This avoids sending raw C structs between processes, so padding, alignment and compiler layout do not become protocol details.
-
-`can_frame_t` stays as internal boundary between protocol code and transport backend:
-
-```text
-SpaceCAN codec <-> can_frame_t <-> UDP transport
-```
-
-This is the main reason later work can swap UDP for SocketCAN or MCU CAN drivers without rewriting the SpaceCAN parser or EPS logic.
+- sunlight/eclipse cycle;
+- solar panel current generation;
+- battery charge/discharge;
+- payload load shedding in low-power modes;
+- battery temperature drift;
+- simple fault injection.
 
 ### `bridge_service`
 
-`bridge_service` listens to the same multicast bus as a passive ground-side receiver.
-
-It does four jobs:
-
-1. receives CAN frames from UDP bus
-2. reassembles fragmented SpaceCAN packets
-3. parses housekeeping reports `service=3 subtype=25`
-4. exposes decoded telemetry as JSON over HTTP and WebSocket
+`bridge_service` receives CAN frames from SocketCAN, reassembles SpaceCAN packets, decodes EPS telemetry and exposes it to the dashboard.
 
 Available bridge outputs:
 
@@ -77,33 +47,128 @@ Available bridge outputs:
 GET /health
 GET /telemetry/latest
 WebSocket /realtime
-GET / minimal live dashboard
+GET / dashboard static files from openmct/dist
 ```
 
-The built-in dashboard is intentionally small and dependency-free. It proves the bridge boundary works before adding fuller Open MCT frontend integration.
+The bridge configures a SocketCAN kernel filter for EPS reply frames from the configured node. This avoids waking the process for unrelated CAN traffic.
 
-### WebSocket handshake code
+Current bridge role is still telemetry receiver/ground bridge. It does not yet act as an OBC router or command authority.
 
-`bridge_service` includes small SHA-1 and Base64 helpers only for WebSocket upgrade handshake:
+### Open MCT dashboard
+
+The frontend in `openmct/` consumes bridge JSON from `/telemetry/latest` and `/realtime`.
+
+It displays:
+
+- connection state;
+- packet age/rate/gaps;
+- EPS state and power mode;
+- bus voltage/current/power;
+- battery SOC/voltage/current;
+- solar current;
+- temperature;
+- status/fault flags;
+- raw JSON/history export.
+
+## SocketCAN setup on Ubuntu
+
+Create a virtual CAN interface:
+
+```sh
+sudo modprobe vcan
+sudo ip link add dev vcan0 type vcan
+sudo ip link set up vcan0
+```
+
+Check it:
+
+```sh
+ip link show vcan0
+```
+
+Optional debugging tools:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y can-utils
+candump vcan0
+```
+
+## Build and run
+
+Install dashboard dependencies once:
+
+```sh
+make dashboard-install
+```
+
+Run tests:
+
+```sh
+make test
+make compat
+```
+
+Build dashboard and run the local demo:
+
+```sh
+make demo
+```
+
+Manual mode:
+
+```sh
+make dashboard-build
+python3 -m bridge_service
+python3 -m eps_emulator
+```
+
+Open:
 
 ```text
-Sec-WebSocket-Accept = base64(sha1(client_key + RFC6455_GUID))
+http://127.0.0.1:8080/
 ```
 
-Constants like `0x67452301u` are standard SHA-1 algorithm constants. `258EAFA5-E914-47DA-95CA-C5AB0DC85B11` is fixed WebSocket RFC 6455 GUID. They are public protocol constants.
+## Runtime configuration
+
+Defaults are loaded from `aetherflow.env`:
+
+```text
+AETHERFLOW_HTTP_PORT=8080
+AETHERFLOW_CAN_INTERFACE=vcan0
+AETHERFLOW_EPS_NODE_ID=1
+AETHERFLOW_LOG_DIR=logs
+```
+
+You can override them per command:
+
+```sh
+AETHERFLOW_CAN_INTERFACE=vcan1 python3 -m bridge_service
+python3 -m eps_emulator --interface vcan1 --critical-interval 0.1 --housekeeping-interval 1.0
+```
+
+## Fault injection
+
+`eps_emulator` opens a local TCP command socket by default:
+
+```text
+127.0.0.1:40710
+```
+
+Examples:
+
+```sh
+printf '%s\n' '{"fault":"panel_short","enabled":true}' | nc 127.0.0.1 40710
+printf '%s\n' '{"fault":"battery_degradation","level":0.35}' | nc 127.0.0.1 40710
+printf '%s\n' '{"fault":"overcurrent","enabled":true}' | nc 127.0.0.1 40710
+printf '%s\n' '{"fault":"clear"}' | nc 127.0.0.1 40710
+```
+
+Fault effects are visible in telemetry fields such as `solar_current_ma`, `battery_current_ma`, `power_mode`, `status_flags` and `fault_flags`.
 
 ## Protocol pieces
 
-### SpaceCAN codec
-
-Implemented as transport-independent C code:
-
-- builds application packets from `service`, `subtype` and payload bytes
-- parses SpaceCAN packets back into views
-- calculates CAN arbitration IDs
-- fragments packets into standard 8-byte CAN frames
-- reassembles single-frame and multi-frame packets
-- uses big-endian integer helpers for C ↔ Python compatibility checks
+### SpaceCAN CAN IDs
 
 Important CAN IDs:
 
@@ -122,231 +187,104 @@ REQUEST 0x601
 HEARTBEAT 0x701
 ```
 
-### EPS housekeeping payload
+Current bridge listens to `0x581` by default.
+
+### EPS housekeeping payload v2
 
 Current EPS telemetry payload is fixed-size and big-endian:
 
 ```text
 sequence              uint16
 state                 uint8
+power_mode            uint8
 bus_voltage_mv        uint16
 bus_current_ma        int16
 battery_percent       uint8
+battery_voltage_mv    uint16
+battery_current_ma    int16
+solar_current_ma      uint16
 temperature_cdeg      int16
-status_flags          uint8
+status_flags          uint16
 ```
 
-This fixed layout is useful for future compatibility vectors against Python/LibreCube tooling.
-
-### `AFC1` CAN frame envelope
-
-UDP transport uses explicit wire encoding:
+Status/fault flags:
 
 ```text
-magic[4]   = AFC1
-version[1]
-flags[1]
-id[4]      = big-endian CAN arbitration ID
-dlc[1]
-data[8]
+0x0001 SAFE_MODE
+0x0002 LOW_BATTERY
+0x0004 OVERTEMP
+0x0008 PANEL_FAULT
+0x0010 BATTERY_DEGRADED
+0x0020 OVERCURRENT
+0x0040 PAYLOAD_SHED
 ```
 
-This keeps transport packets stable even if C compiler, platform or struct layout changes.
+Power modes:
+
+```text
+NOMINAL
+LOW_POWER
+CRITICAL
+SAFE
+```
+
+The EPS model uses hysteresis around SOC thresholds so the mode does not chatter near a boundary.
+
+### SpaceCAN packet format
+
+Application packets still use:
+
+```text
+service uint8
+subtype uint8
+payload bytes
+```
+
+Telemetry is fragmented/reassembled over standard CAN frames using the existing SpaceCAN codec.
+
+Current EPS telemetry subtypes:
+
+```text
+service=3 subtype=25 HOUSEKEEPING_REPORT
+service=3 subtype=26 CRITICAL_REPORT
+```
 
 ## Current architecture
 
 ```text
-include/
-  can_frame.h             CAN frame model
-  can_frame_wire.h        AFC1 wire envelope API
-  eps_simulator.h         EPS node API
-  spacecan.h              SpaceCAN codec API
-  spacecan_services.h     service/subtype constants
-  transport.h             UDP transport API and defaults
+bridge_service/
+  server.py                  HTTP/WebSocket bridge orchestration
+  can_wire.py                CAN frame model and AFC1 compatibility envelope
+  spacecan.py                SpaceCAN ID, packet, fragmentation/reassembly
+  telemetry.py               EPS telemetry decoding and JSON snapshots
+  config.py                  environment configuration
+  transports/
+    base.py                  transport protocol interface
+    socketcan.py             Linux SocketCAN backend and CAN filters
+  eps/
+    constants.py             EPS service/subtype/flag constants
+    schema.py                EPS payload dataclasses and binary codec
+    simulator.py             dynamic EPS model used by eps_emulator
 
-src/
-  controller_simulator_main.c
-  eps_simulator_main.c
-  bridge_service_main.c
-  can_frame_wire.c
-  eps_simulator.c
-  spacecan_*.c
+eps_emulator/
+  __main__.py                Python EPS emulator runtime
 
-transport/
-  udp_transport.c         current macOS local virtual CAN bus
-  memory_transport.c      reserved future backend
-  socketcan_transport.c   reserved Linux SocketCAN backend
+openmct/
+  src/                       dashboard frontend
 
-tests/
-  test_spacecan_codec.c
-  test_eps_simulator.c
+src/, include/, tests/, compat/
+  C SpaceCAN codec, compatibility vectors and regression tests
 ```
 
-## Build and run
+## Future OBC/load-shedding idea
 
-Run full local demo:
+Not implemented yet.
 
-```sh
-make demo
-```
+The bridge can later grow from a passive telemetry bridge into a small OBC/router policy node:
 
-This builds all needed backend services (bridge, EPS simulator, controller simulator), builds OpenMCT dashboard bundle and serves complete demo from bridge service:
+1. EPS reports `LOW_POWER`, `CRITICAL` or `SAFE`.
+2. OBC policy changes virtual power-channel state, for example `payload_enabled=false`.
+3. Bridge stops forwarding payload commands or marks payload telemetry as disabled.
+4. Dashboard exposes a control button and state indication.
 
-```text
-http://127.0.0.1:8080/
-```
-
-Logs are written to `logs/`. Press `Ctrl+C` in the `make demo` terminal to stop all demo processes.
-
-Default local settings are stored in `aetherflow.env` (no secrets). For temporary local overrides, pass variables inline:
-
-```sh
-AETHERFLOW_CONTROLLER_RATE_HZ=10 make demo
-```
-
-Build everything and run tests:
-
-```sh
-make all
-```
-
-Build only backend service binaries:
-
-```sh
-make backend
-```
-
-Run OpenMCT dashboard dev server separately for frontend only:
-
-```sh
-make dashboard-dev
-```
-
-The dev server has its own default port in `openmct/scripts/serve.js`; full demo does not need that port.
-
-Build or preview dashboard production bundle:
-
-```sh
-make dashboard-build
-make dashboard-preview
-```
-
-The dashboard connects to the same bridge origin by default. To point it at another bridge endpoint, pass `?bridge=http://host:port` in the dashboard URL.
-
-### Docker demo
-
-Build and run the complete Linux demo in Docker:
-
-```sh
-docker compose up --build
-```
-
-The Docker image is based on `debian:bookworm-slim`. During image build it runs the same verification/build pipeline as local Linux:
-
-```sh
-npm ci --prefix openmct
-make clean
-make test
-make backend
-make compat
-make dashboard-build
-```
-
-Hosted Docker entrypoint uses single public HTTP port. `bridge_service` serves both telemetry and OpenMCT static bundle.
-
-After the container starts, open:
-
-```text
-http://127.0.0.1:8080/
-```
-
-
-
-```text
-http://127.0.0.1:8080/health
-http://127.0.0.1:8080/telemetry/latest
-ws://127.0.0.1:8080/realtime
-```
-
-Stop the demo with `Ctrl+C`, or from another terminal:
-
-```sh
-docker compose down
-```
-
-### Manual mode for debugging
-
-Use this when you want each service in its own terminal:
-
-```sh
-make backend
-make dashboard-build
-./bridge_service_c
-./eps_simulator
-./controller_simulator 5
-```
-
-Check bridge output:
-
-```sh
-curl http://127.0.0.1:8080/health
-curl http://127.0.0.1:8080/telemetry/latest
-open http://127.0.0.1:8080/
-```
-
-Synthetic EPS mode without UDP transport:
-
-```sh
-make eps_simulator
-./eps_simulator 5
-```
-
-Run codec tests directly:
-
-```sh
-make tests/test_spacecan_codec
-./tests/test_spacecan_codec
-```
-
-Run current test suite:
-
-```sh
-make test
-```
-
-Generate and validate Stage 4 compatibility vectors:
-
-```sh
-make vectors
-make compat
-```
-
-`make compat` validates the current C-generated SpaceCAN vectors with a dependency-free Python reference harness. This checks both directions at byte level:
-
-```text
-C → Python: parse/reassemble C-generated packets and frames
-Python → C: independently re-encode the same scenarios and compare exact bytes
-```
-
-Details are documented in `compat/README.md`.
-
-## Development notes
-
-- UDP multicast transport is tuned for local macOS demo runs
-- `SO_REUSEPORT` is used so multiple local processes can observe same multicast port
-- RX and TX UDP sockets are separate to avoid macOS multicast send/receive edge cases found during smoke tests
-- hardcoded IP/port values are just public demo defaults
-- WebSocket SHA-1 code exists only for RFC 6455 handshake, not for cryptographic security
-- Open MCT integration can sit behind existing `bridge_service` HTTP/WebSocket boundary
-
-## Roadmap
-
-Implemented foundations:
-
-- Stage 4 compatibility vectors and Python harness: `C -> Python`, `Python -> C`
-
-Not implemented yet:
-
-- concrete adapter for upstream `python-spacecan` / `micropython-spacecan` API
-- Linux VM SocketCAN validation: `vcan0`, arbitration IDs, `candump`, packet loss, timeouts, multiple nodes
-- MCU/RTOS transports: `stm32_can_transport.c`, `zephyr_can_transport.c`, `freertos_vendor_can_transport.c`
+For demo purposes, the dashboard button could send a command to the bridge, and the bridge could publish an OBC command frame or update an internal routing policy. EPS critical telemetry should always remain allowed; only non-essential payload traffic should be shed.

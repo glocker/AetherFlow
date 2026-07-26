@@ -23,6 +23,11 @@ export function formatValue(value, format = "string", units = "") {
         ? `0x${Number(value).toString(16).toUpperCase().padStart(2, "0")}`
         : String(value);
       break;
+    case "hex16":
+      formatted = Number.isFinite(value)
+        ? `0x${Number(value).toString(16).toUpperCase().padStart(4, "0")}`
+        : String(value);
+      break;
     case "json":
       formatted = JSON.stringify(value, null, 2);
       break;
@@ -59,9 +64,13 @@ export function decodeStatusFlags(flags) {
   }
 
   const decoded = [];
-  if ((flags & 0x01) !== 0) decoded.push("SAFE_MODE");
-  if ((flags & 0x02) !== 0) decoded.push("LOW_BATTERY");
-  if ((flags & 0x04) !== 0) decoded.push("OVERTEMP");
+  if ((flags & 0x0001) !== 0) decoded.push("SAFE_MODE");
+  if ((flags & 0x0002) !== 0) decoded.push("LOW_BATTERY");
+  if ((flags & 0x0004) !== 0) decoded.push("OVERTEMP");
+  if ((flags & 0x0008) !== 0) decoded.push("PANEL_FAULT");
+  if ((flags & 0x0010) !== 0) decoded.push("BATTERY_DEGRADED");
+  if ((flags & 0x0020) !== 0) decoded.push("OVERCURRENT");
+  if ((flags & 0x0040) !== 0) decoded.push("PAYLOAD_SHED");
 
   return decoded.length > 0 ? decoded : ["NONE"];
 }
@@ -91,11 +100,16 @@ export function toCsv(rows) {
     "subtype",
     "sequence",
     "state",
+    "power_mode",
     "bus_voltage_mv",
     "bus_current_ma",
     "battery_percent",
+    "battery_voltage_mv",
+    "battery_current_ma",
+    "solar_current_ma",
     "temperature_cdeg",
     "status_flags",
+    "fault_flags",
   ];
 
   const escapeCell = (value) => {

@@ -121,6 +121,19 @@ const telemetryPoints = [
     state: (value) => (value === "UNKNOWN" ? "unknown" : "nominal"),
   },
   {
+    key: "eps.power_mode",
+    name: "Power Mode",
+    subsystem: "eps",
+    type: "telemetry.telemetry",
+    format: "string",
+    source: "power_mode",
+    state: (value) => {
+      if (value === "SAFE" || value === "CRITICAL") return "critical";
+      if (value === "LOW_POWER") return "warning";
+      return value === "UNKNOWN" ? "unknown" : "nominal";
+    },
+  },
+  {
     key: "eps.bus_voltage_mv",
     name: "Bus Voltage",
     subsystem: "eps",
@@ -191,6 +204,34 @@ const telemetryPoints = [
     limits: { warningLow: 30, criticalLow: 20 },
   },
   {
+    key: "eps.battery_voltage_mv",
+    name: "Battery Voltage",
+    subsystem: "eps",
+    type: "telemetry.telemetry",
+    units: "mV",
+    format: "integer",
+    source: "battery_voltage_mv",
+    limits: { warningLow: 7000, criticalLow: 6600, warningHigh: 8350, criticalHigh: 8500 },
+  },
+  {
+    key: "eps.battery_current_ma",
+    name: "Battery Current",
+    subsystem: "eps",
+    type: "telemetry.telemetry",
+    units: "mA",
+    format: "integer",
+    source: "battery_current_ma",
+  },
+  {
+    key: "eps.solar_current_ma",
+    name: "Solar Current",
+    subsystem: "eps",
+    type: "telemetry.telemetry",
+    units: "mA",
+    format: "integer",
+    source: "solar_current_ma",
+  },
+  {
     key: "eps.temperature_cdeg",
     name: "Temperature",
     subsystem: "eps",
@@ -215,15 +256,23 @@ const telemetryPoints = [
     name: "Status Flags",
     subsystem: "eps",
     type: "telemetry.telemetry",
-    format: "hex8",
+    format: "hex16",
     source: "status_flags",
     state: (value, _point, context) => {
       if (!context.latestPacket) return "unknown";
       if (!Number.isFinite(value)) return "invalid";
-      if ((value & 0x04) !== 0) return "critical";
-      if ((value & 0x03) !== 0) return "warning";
+      if ((value & 0x0024) !== 0) return "critical";
+      if ((value & 0x005b) !== 0) return "warning";
       return telemetryState(value, undefined, context.latestPacket);
     },
+  },
+  {
+    key: "eps.fault_flags",
+    name: "Fault Flags",
+    subsystem: "eps",
+    type: "telemetry.telemetry",
+    format: "hex16",
+    source: "fault_flags",
   },
   {
     key: "eps.status_flags_decoded",

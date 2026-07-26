@@ -79,9 +79,9 @@ CONSECUTIVE/LAST frames:
   data[1..]  next packet bytes, up to 7 bytes
 ```
 
-### EPS housekeeping payload
+### Legacy EPS housekeeping payload in C vectors
 
-AetherFlow's EPS housekeeping payload is fixed-size, big-endian and currently project-specific:
+The C compatibility vectors still cover the original fixed-size big-endian EPS payload. The active Python SocketCAN runtime uses the newer payload documented in the root `README.md`.
 
 ```text
 sequence              uint16
@@ -93,11 +93,11 @@ temperature_cdeg      int16
 status_flags          uint8
 ```
 
-Total payload length: `11` bytes.
+Total legacy payload length: `11` bytes.
 
-### UDP envelope is not LibreCube SpaceCAN
+### AFC1 envelope is not LibreCube SpaceCAN
 
-The `AFC1` UDP envelope used by the local virtual CAN bus is an AetherFlow development transport. It is intentionally outside the SpaceCAN packet/fragmentation compatibility vectors.
+The `AFC1` envelope is retained only as an AetherFlow compatibility/vector helper. The active runtime uses Linux SocketCAN frames directly. `AFC1` is intentionally outside the SpaceCAN packet/fragmentation compatibility vectors.
 
 ## Compatibility matrix
 
@@ -107,8 +107,8 @@ The `AFC1` UDP envelope used by the local virtual CAN bus is an AetherFlow devel
 | service/subtype packet header | yes | yes | to verify |
 | big-endian EPS payload | yes | yes | project-specific |
 | fragmentation/reassembly | yes | yes | to verify |
-| `AFC1` UDP envelope | yes | not required | not applicable |
-| runtime dependency on Python | no | n/a | no |
+| `AFC1` compatibility envelope | yes | not required | not applicable |
+| active runtime dependency on Python | legacy C vectors only | yes | n/a |
 
 ## Files
 
@@ -150,10 +150,9 @@ This command currently reports whether a likely Python SpaceCAN package is impor
 
 ## Non-goals for Stage 4
 
-- Do not make `bridge_service` depend on Python.
 - Do not claim full LibreCube compliance before upstream vectors pass both ways.
 - Do not block OpenMCT/dashboard work on full LibreCube integration.
-- Do not treat the `AFC1` UDP envelope as part of LibreCube SpaceCAN compatibility.
+- Do not treat the `AFC1` envelope as part of LibreCube SpaceCAN compatibility.
 
 ## Next steps
 
