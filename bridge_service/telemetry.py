@@ -10,14 +10,14 @@ from .eps import (
     EPS_HOUSEKEEPING_PAYLOAD_LEN,
     EpsPowerMode,
     EpsState,
-    SPACECAN_HK_SUBTYPE_CRITICAL_REPORT,
-    SPACECAN_HK_SUBTYPE_REPORT,
-    SPACECAN_SERVICE_HOUSEKEEPING,
+    AETHERFLOWCAN_HK_SUBTYPE_CRITICAL_REPORT,
+    AETHERFLOWCAN_HK_SUBTYPE_REPORT,
+    AETHERFLOWCAN_SERVICE_HOUSEKEEPING,
     decode_housekeeping_payload,
     power_mode_name,
     state_name,
 )
-from .spacecan import SpaceCanPacketView
+from .aetherflow_can import AetherflowCanPacketView
 
 
 @dataclass(slots=True)
@@ -25,7 +25,7 @@ class TelemetrySnapshot:
     valid: bool = False
     node_id: int = 0
     sequence: int = 0
-    subtype: int = SPACECAN_HK_SUBTYPE_REPORT
+    subtype: int = AETHERFLOWCAN_HK_SUBTYPE_REPORT
     state: EpsState | int = EpsState.BOOT
     power_mode: EpsPowerMode | int = EpsPowerMode.NOMINAL
     bus_voltage_mv: int = 0
@@ -48,7 +48,7 @@ def now_ms() -> int:
 def telemetry_to_json(telemetry: TelemetrySnapshot) -> str:
     payload = {
         "node": telemetry.node_id,
-        "service": SPACECAN_SERVICE_HOUSEKEEPING,
+        "service": AETHERFLOWCAN_SERVICE_HOUSEKEEPING,
         "subtype": telemetry.subtype,
         "sequence": telemetry.sequence,
         "state": state_name(telemetry.state),
@@ -69,10 +69,10 @@ def telemetry_to_json(telemetry: TelemetrySnapshot) -> str:
     return telemetry.json
 
 
-def decode_eps_housekeeping(node_id: int, view: SpaceCanPacketView, telemetry: TelemetrySnapshot) -> bool:
-    if view.service != SPACECAN_SERVICE_HOUSEKEEPING:
+def decode_eps_housekeeping(node_id: int, view: AetherflowCanPacketView, telemetry: TelemetrySnapshot) -> bool:
+    if view.service != AETHERFLOWCAN_SERVICE_HOUSEKEEPING:
         return False
-    if view.subtype not in (SPACECAN_HK_SUBTYPE_REPORT, SPACECAN_HK_SUBTYPE_CRITICAL_REPORT):
+    if view.subtype not in (AETHERFLOWCAN_HK_SUBTYPE_REPORT, AETHERFLOWCAN_HK_SUBTYPE_CRITICAL_REPORT):
         return False
     if view.payload_len != EPS_HOUSEKEEPING_PAYLOAD_LEN:
         return False

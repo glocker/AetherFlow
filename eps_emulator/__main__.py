@@ -14,7 +14,7 @@ from typing import cast
 
 from bridge_service.config import CAN_INTERFACE, EPS_NODE_ID
 from bridge_service.eps import EpsPhysicalModel, EpsSimulator, power_mode_name, state_name
-from bridge_service.eps.constants import SPACECAN_HK_SUBTYPE_CRITICAL_REPORT, SPACECAN_HK_SUBTYPE_REPORT
+from bridge_service.eps.constants import AETHERFLOWCAN_HK_SUBTYPE_CRITICAL_REPORT, AETHERFLOWCAN_HK_SUBTYPE_REPORT
 from bridge_service.transports import open_socketcan_transport
 
 DEFAULT_CRITICAL_INTERVAL_S = 0.2
@@ -33,7 +33,7 @@ def handle_signal(_signal_number: int, _frame: object) -> None:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AetherFlow EPS emulator for SocketCAN/vcan")
     parser.add_argument("--interface", default=CAN_INTERFACE, help="SocketCAN interface, default: %(default)s")
-    parser.add_argument("--node-id", type=int, default=EPS_NODE_ID, help="SpaceCAN EPS node id")
+    parser.add_argument("--node-id", type=int, default=EPS_NODE_ID, help="AetherFlow protocol EPS node id")
     parser.add_argument("--critical-interval", type=float, default=DEFAULT_CRITICAL_INTERVAL_S, help="critical telemetry period in seconds")
     parser.add_argument("--housekeeping-interval", type=float, default=DEFAULT_HOUSEKEEPING_INTERVAL_S, help="housekeeping telemetry period in seconds")
     parser.add_argument("--command-host", default=DEFAULT_COMMAND_HOST, help="fault command TCP bind host")
@@ -180,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
                     "eps_emulator: TX critical "
                     f"seq={measurements.sequence} state={state_name(measurements.state)} "
                     f"mode={power_mode_name(measurements.power_mode)} soc={measurements.battery_percent}% "
-                    f"solar={measurements.solar_current_ma}mA subtype={SPACECAN_HK_SUBTYPE_CRITICAL_REPORT}",
+                    f"solar={measurements.solar_current_ma}mA subtype={AETHERFLOWCAN_HK_SUBTYPE_CRITICAL_REPORT}",
                     flush=True,
                 )
             if now >= next_housekeeping:
@@ -193,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
                     "eps_emulator: TX housekeeping "
                     f"seq={measurements.sequence} state={state_name(measurements.state)} "
                     f"mode={power_mode_name(measurements.power_mode)} soc={measurements.battery_percent}% "
-                    f"batt_i={measurements.battery_current_ma}mA subtype={SPACECAN_HK_SUBTYPE_REPORT}",
+                    f"batt_i={measurements.battery_current_ma}mA subtype={AETHERFLOWCAN_HK_SUBTYPE_REPORT}",
                     flush=True,
                 )
     finally:

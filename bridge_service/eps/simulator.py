@@ -1,4 +1,4 @@
-"""Dynamic EPS simulation model for Linux/vcan demos."""
+"""Dynamic EPS simulation model for Linux/vcan runtime."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ import math
 from dataclasses import dataclass, field
 
 from bridge_service.can_wire import CanFrame
-from bridge_service.spacecan import SpaceCanFrameClass, fragment_packet, packet_build
+from bridge_service.aetherflow_can import AetherflowCanFrameClass, fragment_packet, packet_build
 
 from .constants import (
     EPS_FLAG_BATTERY_DEGRADED,
     EPS_FLAG_OVERCURRENT,
     EPS_FLAG_PANEL_FAULT,
     EPS_HOUSEKEEPING_PAYLOAD_LEN,
-    SPACECAN_HK_SUBTYPE_CRITICAL_REPORT,
-    SPACECAN_HK_SUBTYPE_REPORT,
-    SPACECAN_SERVICE_HOUSEKEEPING,
+    AETHERFLOWCAN_HK_SUBTYPE_CRITICAL_REPORT,
+    AETHERFLOWCAN_HK_SUBTYPE_REPORT,
+    AETHERFLOWCAN_SERVICE_HOUSEKEEPING,
 )
 from .schema import EpsMeasurements, EpsPowerMode, EpsState, build_housekeeping_payload, power_mode_for_soc
 
@@ -133,15 +133,15 @@ class EpsSimulator:
             **sample,
         )
 
-    def build_report_frames(self, measurements: EpsMeasurements, subtype: int = SPACECAN_HK_SUBTYPE_REPORT) -> list[CanFrame]:
+    def build_report_frames(self, measurements: EpsMeasurements, subtype: int = AETHERFLOWCAN_HK_SUBTYPE_REPORT) -> list[CanFrame]:
         payload = build_housekeeping_payload(measurements)
         if len(payload) != EPS_HOUSEKEEPING_PAYLOAD_LEN:
             raise ValueError("EPS payload encoder returned invalid length")
-        packet = packet_build(SPACECAN_SERVICE_HOUSEKEEPING, subtype, payload)
-        return fragment_packet(SpaceCanFrameClass.REPLY, self.node_id, packet)
+        packet = packet_build(AETHERFLOWCAN_SERVICE_HOUSEKEEPING, subtype, payload)
+        return fragment_packet(AetherflowCanFrameClass.REPLY, self.node_id, packet)
 
     def build_critical_frames(self, measurements: EpsMeasurements) -> list[CanFrame]:
-        return self.build_report_frames(measurements, SPACECAN_HK_SUBTYPE_CRITICAL_REPORT)
+        return self.build_report_frames(measurements, AETHERFLOWCAN_HK_SUBTYPE_CRITICAL_REPORT)
 
     def build_housekeeping_frames(self, measurements: EpsMeasurements) -> list[CanFrame]:
-        return self.build_report_frames(measurements, SPACECAN_HK_SUBTYPE_REPORT)
+        return self.build_report_frames(measurements, AETHERFLOWCAN_HK_SUBTYPE_REPORT)

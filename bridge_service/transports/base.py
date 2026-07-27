@@ -11,7 +11,7 @@ class CanTransport(Protocol):
     """Minimal CAN transport contract.
 
     Runtime services should depend on this protocol instead of a concrete Linux
-    SocketCAN implementation. That keeps the SpaceCAN/EPS code independent from
+    SocketCAN implementation. That keeps the AetherFlow protocol/EPS code independent from
     the bus backend.
     """
 

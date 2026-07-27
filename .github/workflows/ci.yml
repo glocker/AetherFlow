@@ -33,7 +33,7 @@ jobs:
           python3 -m pytest
 
       - name: Compatibility vectors
-        run: python3 compat/python/check_vectors.py compat/vectors/aetherflow_spacecan_vectors.json
+        run: python3 compat/python/check_vectors.py compat/vectors/aetherflow_can_vectors.json
 
       - name: Dashboard dependencies
         run: npm ci --prefix openmct

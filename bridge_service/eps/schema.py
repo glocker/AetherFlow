@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 
-from bridge_service.spacecan import get_i16_be, get_u16_be, put_i16_be, put_u16_be
+from bridge_service.aetherflow_can import get_i16_be, get_u16_be, put_i16_be, put_u16_be
 
 from .constants import (
     EPS_FLAG_LOW_BATTERY,

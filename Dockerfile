@@ -19,7 +19,7 @@ RUN npm ci --prefix openmct
 COPY . .
 RUN python3 -m compileall aetherflow bridge_service eps_emulator compat/python tests/python \
     && python3 -m pytest \
-    && python3 compat/python/check_vectors.py compat/vectors/aetherflow_spacecan_vectors.json \
+    && python3 compat/python/check_vectors.py compat/vectors/aetherflow_can_vectors.json \
     && npm --prefix openmct run build
 
 FROM debian:bookworm-slim AS runtime

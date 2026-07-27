@@ -12,10 +12,10 @@ from socket import socket as Socket
 
 from .can_wire import CanFrame
 from .config import CAN_INTERFACE, EPS_NODE_ID, HTTP_PORT
-from .spacecan import (
-    SpaceCanFrameClass,
-    SpaceCanReassembly,
-    SpaceCanStatus,
+from .aetherflow_can import (
+    AetherflowCanFrameClass,
+    AetherflowCanReassembly,
+    AetherflowCanStatus,
     packet_parse,
     parse_can_id,
     reassembly_accept,
@@ -241,7 +241,7 @@ def handle_http_client(server: Socket, ws_clients: list[Socket], telemetry: Tele
 
 def handle_can_frame(
     frame: CanFrame,
-    reassemblies: dict[tuple[int, int], SpaceCanReassembly],
+    reassemblies: dict[tuple[int, int], AetherflowCanReassembly],
     telemetry: TelemetrySnapshot,
     ws_clients: list[Socket],
 ) -> None:
@@ -249,11 +249,11 @@ def handle_can_frame(
         parsed_id = parse_can_id(frame.id)
     except ValueError:
         return
-    if parsed_id.frame_class != SpaceCanFrameClass.REPLY:
+    if parsed_id.frame_class != AetherflowCanFrameClass.REPLY:
         return
 
     reassembly_key = (int(parsed_id.frame_class), parsed_id.node_id)
-    reassembly = reassemblies.setdefault(reassembly_key, SpaceCanReassembly())
+    reassembly = reassemblies.setdefault(reassembly_key, AetherflowCanReassembly())
 
     try:
         status, packet = reassembly_accept(reassembly, frame)
@@ -261,9 +261,9 @@ def handle_can_frame(
         print(f"bridge_service: reassembly error for id=0x{frame.id:03X}", file=sys.stderr)
         reassembly.reset()
         return
-    if status == SpaceCanStatus.ERR_IN_PROGRESS:
+    if status == AetherflowCanStatus.ERR_IN_PROGRESS:
         return
-    if status != SpaceCanStatus.OK or packet is None:
+    if status != AetherflowCanStatus.OK or packet is None:
         print(f"bridge_service: reassembly error {int(status)} for id=0x{frame.id:03X}", file=sys.stderr)
         reassembly.reset()
         return
@@ -271,7 +271,7 @@ def handle_can_frame(
     try:
         view = packet_parse(packet)
     except ValueError:
-        print("bridge_service: failed to parse SpaceCAN packet", file=sys.stderr)
+        print("bridge_service: failed to parse AetherFlow protocol packet", file=sys.stderr)
         return
     if decode_eps_housekeeping(parsed_id.node_id, view, telemetry):
         print(f"bridge_service: HK {telemetry.json}", flush=True)
@@ -287,7 +287,7 @@ def main() -> int:
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
     telemetry = TelemetrySnapshot()
-    reassemblies: dict[tuple[int, int], SpaceCanReassembly] = {}
+    reassemblies: dict[tuple[int, int], AetherflowCanReassembly] = {}
     ws_clients: list[Socket] = []
     http_port = HTTP_PORT
 

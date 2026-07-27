@@ -12,7 +12,7 @@ import struct
 from dataclasses import dataclass
 
 from bridge_service.can_wire import CAN_FRAME_MAX_DATA_LEN, CAN_STANDARD_ID_MAX, CanFrame
-from bridge_service.spacecan import SpaceCanFrameClass, make_can_id
+from bridge_service.aetherflow_can import AetherflowCanFrameClass, make_can_id
 
 CAN_EFF_FLAG = 0x80000000
 CAN_RTR_FLAG = 0x40000000
@@ -68,9 +68,9 @@ class SocketCanTransport:
 
 
 def eps_reply_filter(node_id: int) -> CanFilter:
-    """Exact standard-ID filter for SpaceCAN replies from one EPS node."""
+    """Exact standard-ID filter for AetherFlow protocol replies from one EPS node."""
 
-    return CanFilter(make_can_id(SpaceCanFrameClass.REPLY, node_id), CAN_SFF_MASK)
+    return CanFilter(make_can_id(AetherflowCanFrameClass.REPLY, node_id), CAN_SFF_MASK)
 
 
 def open_socketcan_transport(
