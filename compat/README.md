@@ -1,114 +1,8 @@
-# AetherFlow ↔ LibreCube compatibility layer
+# Compatibility and golden vectors
 
-Stage 4 creates a reproducible byte-level compatibility layer around the current C SpaceCAN codec.
+`compat/` stores protocol compatibility notes and committed golden vectors for the AetherFlow CAN Protocol.
 
-The goal is to verify both directions without making the runtime bridge depend on Python:
-
-```text
-C → Python
-Python → C
-```
-
-At this stage, the default Python harness validates the checked-in C-generated vectors with a dependency-free Python reference implementation of the current AetherFlow dialect. Optional LibreCube/python-spacecan probing is available, but non-fatal, until the exact upstream API adapter is implemented.
-
-## AetherFlow SpaceCAN dialect v1
-
-AetherFlow currently implements a compact SpaceCAN/CANopen-style dialect used by the local telemetry demo.
-
-### CAN identifiers
-
-```text
-SYNC      0x080
-REPLY     0x580 + node_id
-REQUEST   0x600 + node_id
-HEARTBEAT 0x700 + node_id
-```
-
-Node IDs are in the range `0..127`. The Stage 3 EPS node uses node `1`, so its reply frames use CAN ID `0x581`.
-
-### Application packet
-
-```text
-byte 0      service
-byte 1      subtype
-byte 2..N   payload
-```
-
-Current demo service/subtype examples:
-
-```text
-service 3, subtype 25  housekeeping.report
-service 20, subtype 1  parameter.get
-```
-
-### Fragmentation
-
-Each CAN data frame starts with a one-byte fragmentation header:
-
-```text
-bits 7..6   fragment kind
-bits 5..0   sequence number
-```
-
-Fragment kinds:
-
-```text
-0  SINGLE
-1  FIRST
-2  CONSECUTIVE
-3  LAST
-```
-
-Single-frame packet:
-
-```text
-data[0]      SINGLE | sequence 0
-data[1..]    packet bytes
-```
-
-Multi-frame packet:
-
-```text
-FIRST frame:
-  data[0]    FIRST | sequence 0
-  data[1]    total packet length
-  data[2..7] first 6 packet bytes
-
-CONSECUTIVE/LAST frames:
-  data[0]    kind | sequence
-  data[1..]  next packet bytes, up to 7 bytes
-```
-
-### Legacy EPS housekeeping payload in C vectors
-
-The C compatibility vectors still cover the original fixed-size big-endian EPS payload. The active Python SocketCAN runtime uses the newer payload documented in the root `README.md`.
-
-```text
-sequence              uint16
-state                 uint8
-bus_voltage_mv        uint16
-bus_current_ma        int16
-battery_percent       uint8
-temperature_cdeg      int16
-status_flags          uint8
-```
-
-Total legacy payload length: `11` bytes.
-
-### AFC1 envelope is not LibreCube SpaceCAN
-
-The `AFC1` envelope is retained only as an AetherFlow compatibility/vector helper. The active runtime uses Linux SocketCAN frames directly. `AFC1` is intentionally outside the SpaceCAN packet/fragmentation compatibility vectors.
-
-## Compatibility matrix
-
-| Feature | AetherFlow C | Python reference harness | LibreCube/python-spacecan status |
-|---|---:|---:|---:|
-| CAN ID ranges | yes | yes | to verify |
-| service/subtype packet header | yes | yes | to verify |
-| big-endian EPS payload | yes | yes | project-specific |
-| fragmentation/reassembly | yes | yes | to verify |
-| `AFC1` compatibility envelope | yes | not required | not applicable |
-| active runtime dependency on Python | legacy C vectors only | yes | n/a |
+Golden vectors are byte-level fixtures: each vector records a semantic packet and the exact CAN frames expected on the wire. They protect the protocol from accidental changes while the project evolves.
 
 ## Files
 
@@ -116,46 +10,57 @@ The `AFC1` envelope is retained only as an AetherFlow compatibility/vector helpe
 compat/
   README.md
   vectors/
-    aetherflow_spacecan_vectors.json
+    aetherflow_can_vectors.json
   python/
     check_vectors.py
-
-tools/
-  generate_spacecan_vectors.c
 ```
+
+Golden-vector test coverage lives in:
+
+```text
+tests/python/test_vectors.py
+```
+
+## Current vector scope
+
+The golden vectors cover:
+
+- CAN ID conventions;
+- `service/subtype/payload` packet format;
+- single-frame fragmentation;
+- multi-frame fragmentation;
+- reassembly expectations;
+- the current EPS housekeeping payload layout.
 
 ## Usage
 
 From the repository root:
 
 ```sh
-make vectors
-make compat
+python compat/python/check_vectors.py compat/vectors/aetherflow_can_vectors.json
+python -m pytest tests/python/test_vectors.py
 ```
 
-`make vectors` rebuilds `compat/vectors/aetherflow_spacecan_vectors.json` from the C codec.
-
-`make compat` runs the dependency-free Python harness and validates:
-
-1. **C → Python**: Python parses/reassembles C-generated frames and verifies semantic fields.
-2. **Python → C**: Python independently re-encodes the same scenarios and compares exact packet/frame bytes against C output.
-
-Optional backend probing:
+Optional LibreCube/CSP probe:
 
 ```sh
-python3 compat/python/check_vectors.py --backend librecube
+python compat/python/check_vectors.py --backend librecube
 ```
 
-This command currently reports whether a likely Python SpaceCAN package is importable. It does not fail the project if LibreCube/python-spacecan is not installed.
+The LibreCube probe is non-fatal. It currently only checks whether likely Python packages are importable.
 
-## Non-goals for Stage 4
+## LibreCube/CSP TODO
 
-- Do not claim full LibreCube compliance before upstream vectors pass both ways.
-- Do not block OpenMCT/dashboard work on full LibreCube integration.
-- Do not treat the `AFC1` envelope as part of LibreCube SpaceCAN compatibility.
+Before deciding whether to use LibreCube/python-spacecan or CSP in the core runtime, verify:
 
-## Next steps
+- [ ] Does the package install cleanly on current Ubuntu/Python?
+- [ ] What is the actual import name and public API?
+- [ ] Does it support CAN fragmentation/reassembly?
+- [ ] What CAN ID conventions does it use?
+- [ ] Does it match AetherFlow's `service/subtype/payload` packet shape?
+- [ ] Can it coexist with project-specific EPS payload schemas?
+- [ ] Would adopting it reduce code without hiding important learning/portfolio value?
 
-1. Add a concrete adapter for the real `python-spacecan` API once the dependency/API shape is selected.
-2. Add MicroPython-compatible checks for `micropython-spacecan` if its API differs.
-3. Publish compatibility notes showing which layers match LibreCube exactly and which remain AetherFlow-specific.
+## Recommendation
+
+Keep `bridge_service/aetherflow_can.py` as the runtime codec until external protocol APIs are verified. Use LibreCube/CSP as optional compatibility targets first, not as mandatory dependencies.
