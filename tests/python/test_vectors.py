@@ -4,15 +4,15 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from bridge_service.spacecan import SpaceCanFrameClass, SpaceCanReassembly, fragment_packet, packet_build, reassembly_accept
+from bridge_service.aetherflow_can import AetherflowCanFrameClass, AetherflowCanReassembly, fragment_packet, packet_build, reassembly_accept
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-VECTOR_FILE = PROJECT_ROOT / "compat" / "vectors" / "aetherflow_spacecan_vectors.json"
+VECTOR_FILE = PROJECT_ROOT / "compat" / "vectors" / "aetherflow_can_vectors.json"
 FRAME_CLASSES = {
-    "sync": SpaceCanFrameClass.SYNC,
-    "heartbeat": SpaceCanFrameClass.HEARTBEAT,
-    "request": SpaceCanFrameClass.REQUEST,
-    "reply": SpaceCanFrameClass.REPLY,
+    "sync": AetherflowCanFrameClass.SYNC,
+    "heartbeat": AetherflowCanFrameClass.HEARTBEAT,
+    "request": AetherflowCanFrameClass.REQUEST,
+    "reply": AetherflowCanFrameClass.REPLY,
 }
 
 
@@ -25,11 +25,11 @@ def parse_can_id(value: str | int) -> int:
 def load_vectors() -> list[dict[str, Any]]:
     with VECTOR_FILE.open("r", encoding="utf-8") as file:
         document = json.load(file)
-    assert document["schema"] == "aetherflow.spacecan.vectors"
+    assert document["schema"] == "aetherflow.can_protocol.vectors"
     return cast(list[dict[str, Any]], document["vectors"])
 
 
-def test_golden_vectors_are_stable_against_python_spacecan() -> None:
+def test_golden_vectors_are_stable_against_python_aetherflow_can() -> None:
     vectors = load_vectors()
     assert vectors
 
@@ -49,7 +49,7 @@ def test_golden_vectors_are_stable_against_python_spacecan() -> None:
             assert frame.dlc == expected["dlc"], vector["name"]
             assert frame.data.hex() == expected["data_hex"], vector["name"]
 
-        state = SpaceCanReassembly()
+        state = AetherflowCanReassembly()
         reassembled = None
         for frame in frames:
             _status, reassembled = reassembly_accept(state, frame)
