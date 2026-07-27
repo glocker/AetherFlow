@@ -51,7 +51,7 @@ The LibreCube probe is non-fatal. It currently only checks whether likely Python
 
 ## LibreCube/CSP TODO
 
-Before deciding whether to use LibreCube/python-spacecan or CSP in the core runtime, verify:
+
 
 - [ ] Does the package install cleanly on current Ubuntu/Python?
 - [ ] What is the actual import name and public API?
@@ -59,8 +59,4 @@ Before deciding whether to use LibreCube/python-spacecan or CSP in the core runt
 - [ ] What CAN ID conventions does it use?
 - [ ] Does it match AetherFlow's `service/subtype/payload` packet shape?
 - [ ] Can it coexist with project-specific EPS payload schemas?
-- [ ] Would adopting it reduce code without hiding important learning/portfolio value?
-
-## Recommendation
-
-Keep `bridge_service/aetherflow_can.py` as the runtime codec until external protocol APIs are verified. Use LibreCube/CSP as optional compatibility targets first, not as mandatory dependencies.
+- [ ] Would adopting it reduce code?
