@@ -59,4 +59,4 @@ The LibreCube probe is non-fatal. It currently only checks whether likely Python
 - [ ] What CAN ID conventions does it use?
 - [ ] Does it match AetherFlow's `service/subtype/payload` packet shape?
 - [ ] Can it coexist with project-specific EPS payload schemas?
-- [ ] Would adopting it reduce code?
+- [ ] Would it reduce code?
