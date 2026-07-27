@@ -1,11 +1,8 @@
-# C test/vector build outputs
-/tests/test_spacecan_codec
-/tests/test_eps_simulator
-/tools/generate_spacecan_vectors
-
 # Python
+.venv/
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Runtime artifacts
 /logs/

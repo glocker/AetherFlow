@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aetherflow"
+version = "0.1.0"
+description = "Python-first CubeSat EPS telemetry stack for Linux SocketCAN"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+aetherflow = "aetherflow.__main__:main"
+bridge-service = "bridge_service.server:main"
+eps-emulator = "eps_emulator.__main__:main"
+
+[tool.setuptools.packages.find]
+include = [
+    "aetherflow*",
+    "bridge_service*",
+    "eps_emulator*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+pythonpath = ["."]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"

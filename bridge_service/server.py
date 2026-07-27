@@ -28,7 +28,7 @@ MAX_WS_CLIENTS = 8
 HTTP_REQUEST_MAX = 2048
 DASHBOARD_DIST_DIR = Path("openmct/dist")
 DASHBOARD_INDEX = DASHBOARD_DIST_DIR / "index.html"
-DASHBOARD_NOT_BUILT_MESSAGE = "Dashboard is not built. Run: make dashboard-build"
+DASHBOARD_NOT_BUILT_MESSAGE = "Dashboard is not built. Run: npm --prefix openmct run build"
 
 _keep_running = True
 

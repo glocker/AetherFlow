@@ -4,12 +4,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
         ca-certificates \
-        make \
         nodejs \
         npm \
         python3 \
+        python3-pytest \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -18,10 +17,10 @@ COPY openmct/package.json openmct/package-lock.json ./openmct/
 RUN npm ci --prefix openmct
 
 COPY . .
-RUN make clean \
-    && make test \
-    && make compat \
-    && make dashboard-build
+RUN python3 -m compileall aetherflow bridge_service eps_emulator compat/python tests/python \
+    && python3 -m pytest \
+    && python3 compat/python/check_vectors.py compat/vectors/aetherflow_spacecan_vectors.json \
+    && npm --prefix openmct run build
 
 FROM debian:bookworm-slim AS runtime
 
@@ -41,4 +40,4 @@ COPY --from=build /app /app
 
 EXPOSE 8080
 
-CMD ["python3", "-m", "bridge_service"]
+CMD ["python3", "-m", "aetherflow"]

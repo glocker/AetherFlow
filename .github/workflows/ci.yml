@@ -17,45 +17,26 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install Python package and test dependencies
+        run: python3 -m pip install -e ".[dev]"
+
       - name: Tool versions
         run: |
-          cc --version || true
           python3 --version
+          python3 -m pytest --version
           node --version
           npm --version
 
-      - name: Backend and protocol tests
-        run: make test
+      - name: Python tests
+        run: |
+          python3 -m compileall aetherflow bridge_service eps_emulator compat/python tests/python
+          python3 -m pytest
 
       - name: Compatibility vectors
-        run: make compat
+        run: python3 compat/python/check_vectors.py compat/vectors/aetherflow_spacecan_vectors.json
 
       - name: Dashboard dependencies
-        run: |
-          if [ -f openmct/package-lock.json ]; then
-            npm ci --prefix openmct
-          else
-            npm install --prefix openmct
-          fi
+        run: npm ci --prefix openmct
 
       - name: Dashboard build
-        run: make dashboard-build
-
-  shellcheck:
-    name: ShellCheck
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-
-      - name: Check shell scripts
-        run: |
-          if [ -d tools ]; then
-            find tools -name '*.sh' -print -exec shellcheck {} +
-          else
-            echo 'No tools directory found, skipping ShellCheck.'
-          fi
+        run: npm --prefix openmct run build
